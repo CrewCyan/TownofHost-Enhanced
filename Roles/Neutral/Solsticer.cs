@@ -10,6 +10,7 @@ namespace TOHE.Roles.Neutral
     public static class Solsticer
     {
         private static readonly int Id = 26200;
+        public static bool IsEnable = false;
 
         public static OptionItem EveryOneKnowSolsticer;
         public static OptionItem SolsticerCanVent;
@@ -28,22 +29,22 @@ namespace TOHE.Roles.Neutral
         public static string MurderMessage;
         public static void SetupCustomOption()
         {
-            SetupSingleRoleOptions(Id, TabGroup.OtherRoles, CustomRoles.Solsticer, 1);
-            EveryOneKnowSolsticer = BooleanOptionItem.Create(Id + 10, "EveryOneKnowSolsticer", true, TabGroup.OtherRoles, false)
+            SetupSingleRoleOptions(Id, TabGroup.NeutralRoles, CustomRoles.Solsticer, 1);
+            EveryOneKnowSolsticer = BooleanOptionItem.Create(Id + 10, "EveryOneKnowSolsticer", true, TabGroup.NeutralRoles, false)
                 .SetParent(Options.CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            SolsticerKnowKiller = BooleanOptionItem.Create(Id + 11, "SolsticerKnowItsKiller", true, TabGroup.OtherRoles, false)
+            SolsticerKnowKiller = BooleanOptionItem.Create(Id + 11, "SolsticerKnowItsKiller", true, TabGroup.NeutralRoles, false)
                 .SetParent(Options.CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            SolsticerCanVent = BooleanOptionItem.Create(Id + 12, "CanVent", false, TabGroup.OtherRoles, false)
+            SolsticerCanVent = BooleanOptionItem.Create(Id + 12, "CanVent", false, TabGroup.NeutralRoles, false)
                 .SetParent(CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            SolsticerCanGuess = BooleanOptionItem.Create(Id + 13, "CanGuess", false, TabGroup.OtherRoles, false)
+            SolsticerCanGuess = BooleanOptionItem.Create(Id + 13, "CanGuess", false, TabGroup.NeutralRoles, false)
                 .SetParent(CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            SolsticerSpeed = FloatOptionItem.Create(Id + 14, "SolsticerSpeed", new(0, 5, 0.1f), 1.5f, TabGroup.OtherRoles, false)
+            SolsticerSpeed = FloatOptionItem.Create(Id + 14, "SolsticerSpeed", new(0, 5, 0.1f), 1.5f, TabGroup.NeutralRoles, false)
                 .SetParent(CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            RemainingTasksToBeWarned = IntegerOptionItem.Create(Id + 15, "SolsticerRemainingTaskWarned", new(0, 10, 1), 1, TabGroup.OtherRoles, false)
+            RemainingTasksToBeWarned = IntegerOptionItem.Create(Id + 15, "SolsticerRemainingTaskWarned", new(0, 10, 1), 1, TabGroup.NeutralRoles, false)
                 .SetParent(CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            AddTasksPreDeadPlayer = FloatOptionItem.Create(Id + 16, "SAddTasksPreDeadPlayer", new(0, 15, 0.1f), 0.5f, TabGroup.OtherRoles, false)
+            AddTasksPreDeadPlayer = FloatOptionItem.Create(Id + 16, "SAddTasksPreDeadPlayer", new(0, 15, 0.1f), 0.5f, TabGroup.NeutralRoles, false)
                 .SetParent(CustomRoleSpawnChances[CustomRoles.Solsticer]);
-            SolsticerTasks = OverrideTasksData.Create(Id + 17, TabGroup.OtherRoles, CustomRoles.Solsticer);
+            SolsticerTasks = OverrideTasksData.Create(Id + 17, TabGroup.NeutralRoles, CustomRoles.Solsticer);
         }
         public static void Init()
         {
@@ -54,11 +55,13 @@ namespace TOHE.Roles.Neutral
             Count = 0;
             CanGuess = true;
             MurderMessage = "";
+            IsEnable = false;
         }
         
         public static void Add(byte playerId)
         {
             playerid = playerId;
+            IsEnable = true;
         }
         public static void ApplyGameOptions()
         {
@@ -118,7 +121,8 @@ namespace TOHE.Roles.Neutral
             if (killer == null || target == null) return false;
             if (!GameStates.IsMeeting)
             {
-                if (killer.Is(CustomRoles.Quizmaster)) {
+                if (killer.Is(CustomRoles.Quizmaster))
+                {
                     return false;
                 }
                 Utils.RpcTeleport(target, ExtendedPlayerControl.GetBlackRoomPosition());

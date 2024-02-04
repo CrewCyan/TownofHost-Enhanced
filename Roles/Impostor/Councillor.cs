@@ -14,7 +14,7 @@ namespace TOHE.Roles.Impostor;
 public static class Councillor
 {
     private static readonly int Id = 1000;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     private static OptionItem MurderLimitPerMeeting;
@@ -23,8 +23,8 @@ public static class Councillor
     private static OptionItem CanMurderMadmate;
     private static OptionItem CanMurderImpostor;
     public static OptionItem KillCooldown;
-    private static Dictionary<byte, int> MurderLimit;
-   // private static Dictionary<byte, int> MurderLimitGame;
+    private static Dictionary<byte, int> MurderLimit = [];
+    // private static Dictionary<byte, int> MurderLimitGame;
 
     public static void SetupCustomOption()
     {
@@ -42,8 +42,8 @@ public static class Councillor
     }
     public static void Init()
     {
-        playerIdList = new();
-        MurderLimit = new();
+        playerIdList = [];
+        MurderLimit = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -52,10 +52,12 @@ public static class Councillor
         MurderLimit.Add(playerId, MurderLimitPerMeeting.GetInt());
         IsEnable = true;
     }
-    public static void OnReportDeadBody()
+    public static void AfterMeetingTasks()
     {
-        MurderLimit.Clear();
-        foreach (var pc in playerIdList.ToArray()) MurderLimit.Add(pc, MurderLimitPerMeeting.GetInt());
+        foreach (byte playerId in MurderLimit.Keys)
+        {
+            MurderLimit[playerId] = MurderLimitPerMeeting.GetInt();
+        }
     }
     public static bool MurderMsg(PlayerControl pc, string msg, bool isUI = false)
     {
@@ -104,6 +106,7 @@ public static class Councillor
             {
                 Logger.Info($"{pc.GetNameWithRole()} 审判了 {target.GetNameWithRole()}", "Councillor");
                 bool CouncillorSuicide = true;
+                if (!MurderLimit.ContainsKey(pc.PlayerId)) MurderLimit[pc.PlayerId] = MurderLimitPerMeeting.GetInt();
                 if (MurderLimit[pc.PlayerId] < 1)
                 {
                     if (!isUI) Utils.SendMessage(GetString("CouncillorMurderMax"), pc.PlayerId);

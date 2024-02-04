@@ -5,7 +5,6 @@ using System.Linq;
 using TOHE.Roles.Double;
 using TOHE.Roles.Impostor;
 using TOHE.Roles.Neutral;
-using static TOHE.Translator;
 
 namespace TOHE.Modules;
 
@@ -16,8 +15,7 @@ internal class CustomRoleSelector
 
     public static void SelectCustomRoles()
     {
-        // 开始职业抽取
-        RoleResult = new();
+        RoleResult = [];
         var rd = IRandom.Instance;
         int playerCount = Main.AllAlivePlayerControls.Length;
         int optImpNum = Main.RealOptionsData.GetInt(Int32OptionNames.NumImpostors);
@@ -37,26 +35,26 @@ internal class CustomRoleSelector
         int readyNonNeutralKillingNum = 0;
         int readyNeutralKillingNum = 0;
 
-        List<CustomRoles> rolesToAssign = new();
-        List<CustomRoles> roleList = new();
-        List<CustomRoles> roleOnList = new();
+        List<CustomRoles> rolesToAssign = [];
+        List<CustomRoles> roleList = [];
+        List<CustomRoles> roleOnList = [];
 
-        List<CustomRoles> ImpOnList = new();
-        List<CustomRoles> MiniOnList = new();
-        List<CustomRoles> ImpRateList = new();
-        List<CustomRoles> MiniRateList = new();
+        List<CustomRoles> ImpOnList = [];
+        List<CustomRoles> MiniOnList = [];
+        List<CustomRoles> ImpRateList = [];
+        List<CustomRoles> MiniRateList = [];
 
-        List<CustomRoles> NonNeutralKillingOnList = new();
-        List<CustomRoles> NonNeutralKillingRateList = new();
+        List<CustomRoles> NonNeutralKillingOnList = [];
+        List<CustomRoles> NonNeutralKillingRateList = [];
 
-        List<CustomRoles> NeutralKillingOnList = new();
-        List<CustomRoles> NeutralKillingRateList = new();
+        List<CustomRoles> NeutralKillingOnList = [];
+        List<CustomRoles> NeutralKillingRateList = [];
 
-        List<CustomRoles> roleRateList = new();
+        List<CustomRoles> roleRateList = [];
 
         if (Options.CurrentGameMode == CustomGameMode.FFA)
         {
-            RoleResult = new();
+            RoleResult = [];
             foreach (PlayerControl pc in Main.AllAlivePlayerControls)
             {
                 RoleResult.Add(pc, CustomRoles.Killer);
@@ -106,22 +104,28 @@ internal class CustomRoleSelector
         }
 
         // 职业设置为：优先
-        foreach (var role in roleList.ToArray()) if (role.GetMode() == 2)
+        foreach (var role in roleList.ToArray())
         {
-            if (role.IsImpostor()) ImpOnList.Add(role);
-            else if (role.IsMini()) MiniOnList.Add(role);
-            else if (role.IsNonNK()) NonNeutralKillingOnList.Add(role);
-            else if (role.IsNK()) NeutralKillingOnList.Add(role);
-            else roleOnList.Add(role);
+            if (role.GetMode() == 2)
+            {
+                if (role.IsImpostor()) ImpOnList.Add(role);
+                else if (role.IsMini()) MiniOnList.Add(role);
+                else if (role.IsNonNK()) NonNeutralKillingOnList.Add(role);
+                else if (role.IsNK()) NeutralKillingOnList.Add(role);
+                else roleOnList.Add(role);
+            }
         }
         // 职业设置为：启用
-        foreach (var role in roleList.ToArray()) if (role.GetMode() == 1)
+        foreach (var role in roleList.ToArray())
         {
-            if (role.IsImpostor()) ImpRateList.Add(role);
-            else if (role.IsMini()) MiniRateList.Add(role);
-            else if (role.IsNonNK()) NonNeutralKillingRateList.Add(role);
-            else if (role.IsNK()) NeutralKillingRateList.Add(role);
-            else roleRateList.Add(role);
+            if (role.GetMode() == 1)
+            {
+                if (role.IsImpostor()) ImpRateList.Add(role);
+                else if (role.IsMini()) MiniRateList.Add(role);
+                else if (role.IsNonNK()) NonNeutralKillingRateList.Add(role);
+                else if (role.IsNK()) NeutralKillingRateList.Add(role);
+                else roleRateList.Add(role);
+            }
         }
 
         while (MiniOnList.Count == 1)
@@ -265,22 +269,14 @@ internal class CustomRoleSelector
     EndOfAssign:
 
         if (rd.Next(0, 100) < Options.SunnyboyChance.GetInt() && rolesToAssign.Remove(CustomRoles.Jester)) rolesToAssign.Add(CustomRoles.Sunnyboy);
-        if (rd.Next(0, 100) < Sans.BardChance.GetInt() && rolesToAssign.Remove(CustomRoles.Sans)) rolesToAssign.Add(CustomRoles.Bard);
+        if (rd.Next(0, 100) < Arrogance.BardChance.GetInt() && rolesToAssign.Remove(CustomRoles.Arrogance)) rolesToAssign.Add(CustomRoles.Bard);
         if (rd.Next(0, 100) < Vampire.VampiressChance.GetInt() && rolesToAssign.Remove(CustomRoles.Vampire)) rolesToAssign.Add(CustomRoles.Vampiress);
         if (rd.Next(0, 100) < Options.NukerChance.GetInt() && rolesToAssign.Remove(CustomRoles.Bomber)) rolesToAssign.Add(CustomRoles.Nuker);
 
-        if (NSerialKiller.HasSerialKillerBuddy.GetBool() && rolesToAssign.Contains(CustomRoles.NSerialKiller))
+        if (SerialKiller.HasSerialKillerBuddy.GetBool() && rolesToAssign.Contains(CustomRoles.SerialKiller))
         {
-            if (rd.Next(0, 100) < NSerialKiller.ChanceToSpawn.GetInt()) rolesToAssign.Add(CustomRoles.NSerialKiller);
-            //if (rd.Next(0, 100) < NSerialKiller.ChanceToSpawnAnother.GetInt()) rolesToAssign.Add(CustomRoles.NSerialKiller);
-        }
-
-        if (Options.NeutralKillingRolesMaxPlayer.GetInt() > 1 && !Options.TemporaryAntiBlackoutFix.GetBool())
-        {
-            _ = new LateTask(() =>
-            {
-                Logger.SendInGame(GetString("NeutralKillingBlackoutWarning"));
-            }, 4f, "Neutral Killing Blackout Warning");
+            if (rd.Next(0, 100) < SerialKiller.ChanceToSpawn.GetInt()) rolesToAssign.Add(CustomRoles.SerialKiller);
+            //if (rd.Next(0, 100) < SerialKiller.ChanceToSpawnAnother.GetInt()) rolesToAssign.Add(CustomRoles.SerialKiller);
         }
 
         if (Romantic.IsEnable)
@@ -294,8 +290,8 @@ internal class CustomRoleSelector
             }
         }
 
-        /*  if (!rolesToAssign.Contains(CustomRoles.Lovers) && rolesToAssign.Contains(CustomRoles.FFF) || !rolesToAssign.Contains(CustomRoles.Ntr) && rolesToAssign.Contains(CustomRoles.FFF))
-              rolesToAssign.Remove(CustomRoles.FFF); 
+        /*  if (!rolesToAssign.Contains(CustomRoles.Lovers) && rolesToAssign.Contains(CustomRoles.Hater) || !rolesToAssign.Contains(CustomRoles.Ntr) && rolesToAssign.Contains(CustomRoles.Hater))
+              rolesToAssign.Remove(CustomRoles.Hater); 
               rolesToAssign.Add(CustomRoles.Jester); */
 
         /*   if (!Options.DisableSaboteur.GetBool()) // no longer hidden
@@ -378,7 +374,7 @@ internal class CustomRoleSelector
 
         if (AllPlayer.Count > 0)
             Logger.Error("Role assignment error: There are players who have not been assigned role", "CustomRoleSelector");
-        
+
         if (rolesToAssign.Count > 0)
             Logger.Error("Role assignment error: There is an unassigned role", "CustomRoleSelector");
 
@@ -389,7 +385,6 @@ internal class CustomRoleSelector
     public static int addShapeshifterNum = 0;
     public static void CalculateVanillaRoleCount()
     {
-        // 计算原版特殊职业数量
         addEngineerNum = 0;
         addScientistNum = 0;
         addShapeshifterNum = 0;
@@ -404,30 +399,104 @@ internal class CustomRoleSelector
         }
     }
 
-    public static List<CustomRoles> AddonRolesList = new();
+    public static List<CustomRoles> AddonRolesList = [];
     public static void SelectAddonRoles()
     {
         if (Options.CurrentGameMode == CustomGameMode.FFA) return;
-        AddonRolesList = new();
+
+        AddonRolesList = [];
         foreach (var cr in CustomRolesHelper.AllRoles)
         {
             CustomRoles role = (CustomRoles)Enum.Parse(typeof(CustomRoles), cr.ToString());
             if (!role.IsAdditionRole()) continue;
-            if (role is CustomRoles.Madmate && Options.MadmateSpawnMode.GetInt() != 0) continue;
-            if (role is CustomRoles.Lovers or CustomRoles.LastImpostor or CustomRoles.Workhorse) continue;
 
-            if (GameStates.FungleIsActive) // The Fungle
-            {
-                if (role is CustomRoles.Mare) continue;
-            }
-            //else if (Options.IsActiveDleks) // Dleks
-            //{
-            //    if (role is CustomRoles.Nimble
-            //        or CustomRoles.Burst
-            //        or CustomRoles.Circumvent) continue;
-            //}
+            if (NotAssignAddOnInGameStarted(role)) continue;
 
             AddonRolesList.Add(role);
         }
+    }
+
+    public static void AssignAddonRoles()
+    {
+        if (Options.CurrentGameMode == CustomGameMode.FFA) return;
+
+        var rd = IRandom.Instance;
+        List<CustomRoles> addonsList = [];
+        List<CustomRoles> addonsIsEnableList = [];
+
+        // Sort Add-ons by spawn rate
+        var sortAddOns = Options.CustomAdtRoleSpawnRate.OrderByDescending(role => role.Value.GetFloat());
+        var dictionarSortAddOns = sortAddOns.ToDictionary(x => x.Key, x => x.Value);
+
+        // Add only enabled add-ons
+        foreach (var addonKVP in dictionarSortAddOns.Where(a => a.Key.IsEnable()).ToArray())
+        {
+            if (!NotAssignAddOnInGameStarted(addonKVP.Key))
+            {
+                addonsIsEnableList.Add(addonKVP.Key);
+            }
+        }
+
+        Logger.Info($"Number enabled of add-ons (before priority): {addonsIsEnableList.Count}", "Check Add-ons Count");
+
+        // Add addons which have a percentage greater than 90
+        foreach (var addonKVP in dictionarSortAddOns.Where(a => a.Key.IsEnable() && a.Value.GetFloat() >= 90).ToArray())
+        {
+            var addon = addonKVP.Key;
+
+            if (AddonRolesList.Contains(addon))
+            {
+                addonsList.Add(addon);
+                addonsIsEnableList.Remove(addon);
+            }
+        }
+
+        Logger.Info($"Number enabled of add-ons (after priority): {addonsIsEnableList.Count}", "Check Add-ons Count");
+
+        // Add addons randomly
+        while (addonsIsEnableList.Count > 0)
+        {
+            int randomItem = rd.Next(addonsIsEnableList.Count);
+            var randomAddOn = addonsIsEnableList[randomItem];
+
+            if (!addonsList.Contains(randomAddOn) && AddonRolesList.Contains(randomAddOn))
+            {
+                addonsList.Add(randomAddOn);
+            }
+
+            // Even if an add-on cannot be added, it must be removed from the "addonsIsEnableList"
+            // To prevent the game from freezing
+            addonsIsEnableList.Remove(randomAddOn);
+        }
+
+        Logger.Info($" Is Started", "Assign Add-ons");
+
+        // Assign add-ons
+        foreach (var role in addonsList.ToArray())
+        {
+            if (rd.Next(1, 101) <= (Options.CustomAdtRoleSpawnRate.TryGetValue(role, out var sc) ? sc.GetFloat() : 0))
+            {
+                SelectRolesPatch.AssignSubRoles(role);
+            }
+        }
+    }
+    public static bool NotAssignAddOnInGameStarted(CustomRoles role)
+    {
+        if (role is CustomRoles.Madmate && Options.MadmateSpawnMode.GetInt() != 0) return true;
+        if (role is CustomRoles.Lovers or CustomRoles.LastImpostor or CustomRoles.Workhorse) return true;
+
+        if (GameStates.FungleIsActive) // The Fungle
+        {
+            if (role is CustomRoles.Mare) return true;
+        }
+
+        /*else if (Options.IsActiveDleks) // Dleks
+        {
+            if (role is CustomRoles.Nimble
+                or CustomRoles.Burst
+                or CustomRoles.Circumvent) continue;
+        */
+
+        return false;
     }
 }

@@ -2,6 +2,7 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TOHE.Roles.Impostor;
 using UnityEngine;
 
 namespace TOHE;
@@ -11,7 +12,7 @@ class RandomSpawn
     [HarmonyPatch(typeof(CustomNetworkTransform), nameof(CustomNetworkTransform.SnapTo), typeof(Vector2), typeof(ushort))]
     public class CustomNetworkTransformPatch
     {
-        public static Dictionary<byte, int> NumOfTP = new();
+        public static Dictionary<byte, int> NumOfTP = [];
         public static void Postfix(CustomNetworkTransform __instance, [HarmonyArgument(0)] Vector2 position)
         {
             if (!AmongUsClient.Instance.AmHost) return;
@@ -39,6 +40,11 @@ class RandomSpawn
                     if (!GameStates.AirshipIsActive)
                     {
                         return;
+                    }
+
+                    if (player.Is(CustomRoles.Penguin))
+                    {
+                        Penguin.OnSpawnAirship();
                     }
 
                     if (GameStates.IsNormalGame)

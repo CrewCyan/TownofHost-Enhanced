@@ -6,7 +6,8 @@ namespace TOHE.Roles.Crewmate;
 public static class SabotageMaster
 {
     private static readonly int Id = 8500;
-    public static List<byte> playerIdList = new();
+    public static List<byte> playerIdList = [];
+    public static Dictionary<byte, float> UsedSkillCount = [];
     public static bool IsEnable = false;
 
     public static OptionItem SkillLimit;
@@ -18,7 +19,6 @@ public static class SabotageMaster
     public static OptionItem SMAbilityUseGainWithEachTaskCompleted;
     private static OptionItem UsesUsedWhenFixingReactorOrO2;
     private static OptionItem UsesUsedWhenFixingLightsOrComms;
-    public static Dictionary<byte, float> UsedSkillCount = new();
 
     private static bool DoorsProgressing = false;
 
@@ -44,8 +44,8 @@ public static class SabotageMaster
     }
     public static void Init()
     {
-        playerIdList = new();
-        UsedSkillCount = new();
+        playerIdList = [];
+        UsedSkillCount = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -53,6 +53,11 @@ public static class SabotageMaster
         playerIdList.Add(playerId);
         UsedSkillCount.Add(playerId, 0);
         IsEnable = true;
+    }
+    public static void Remove(byte playerId)
+    {
+        playerIdList.Remove(playerId);
+        UsedSkillCount.Remove(playerId);
     }
     public static void UpdateSystem(ShipStatus __instance, SystemTypes systemType, byte amount, byte playerId)
     {

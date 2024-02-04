@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TOHE.Modules;
 using TOHE.Roles.Crewmate;
+using TOHE.Roles.Double;
 using TOHE.Roles.Neutral;
 using UnityEngine;
 using static TOHE.Options;
@@ -17,7 +18,7 @@ public static class Puppeteer
     private static readonly int Id = 4300;
     public static bool IsEnable = false;
 
-    public static Dictionary<byte, byte> PuppeteerList = new();
+    public static Dictionary<byte, byte> PuppeteerList = [];
     public static OptionItem PuppeteerDoubleKills;
 
     public static void SetupCustomOption()
@@ -28,7 +29,7 @@ public static class Puppeteer
     }
     public static void Init()
     {
-        PuppeteerList = new();
+        PuppeteerList = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -68,7 +69,7 @@ public static class Puppeteer
     }
     public static bool OnCheckPuppet(PlayerControl killer, PlayerControl target)
     {
-        if (target.Is(CustomRoles.Needy) || target.Is(CustomRoles.Lazy) || Medic.ProtectList.Contains(target.PlayerId)) return false;
+        if (target.Is(CustomRoles.Needy) || target.Is(CustomRoles.Lazy) || target.Is(CustomRoles.NiceMini) && Mini.Age < 18 || Medic.ProtectList.Contains(target.PlayerId)) return false;
             return killer.CheckDoubleTrigger(target, () => 
             {         
                 PuppeteerList[target.PlayerId] = killer.PlayerId;
@@ -93,7 +94,7 @@ public static class Puppeteer
         else
         {
             var puppeteerPos = puppet.transform.position;
-            Dictionary<byte, float> targetDistance = new();
+            Dictionary<byte, float> targetDistance = [];
             float dis;
 
             foreach (var target in Main.AllAlivePlayerControls)

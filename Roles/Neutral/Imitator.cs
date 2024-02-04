@@ -10,23 +10,23 @@ namespace TOHE.Roles.Neutral;
 public static class Imitator
 {
     private static readonly int Id = 13000;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     public static OptionItem RememberCooldown;
     public static OptionItem RefugeeKillCD;
     public static OptionItem IncompatibleNeutralMode;
     public static readonly string[] ImitatorIncompatibleNeutralMode =
-    {
+    [
         "Role.Imitator",
         "Role.Witch",
         "Role.Pursuer",
         "Role.Follower",
         "Role.Maverick",
         "Role.Amnesiac",
-    };
+    ];
 
-    private static Dictionary<byte, int> RememberLimit = new();
+    private static Dictionary<byte, int> RememberLimit = [];
 
     public static void SetupCustomOption()
     {
@@ -37,8 +37,8 @@ public static class Imitator
     }
     public static void Init()
     {
-        playerIdList = new();
-        RememberLimit = new();
+        playerIdList = [];
+        RememberLimit = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -133,26 +133,21 @@ public static class Imitator
                     killer.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Imitator), GetString("RememberedImitator")));
                     break;
                 case 1:
-                    killer.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Imitator), GetString("RememberedWitch")));
-                    killer.RpcSetCustomRole(CustomRoles.NWitch);
-                    NWitch.Add(killer.PlayerId);
-                    break;
-                case 2:
                     killer.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Imitator), GetString("RememberedPursuer")));
                     killer.RpcSetCustomRole(CustomRoles.Pursuer);
                     Pursuer.Add(killer.PlayerId);
                     break;
-                case 3:
+                case 2:
                     killer.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Imitator), GetString("RememberedFollower")));
                     killer.RpcSetCustomRole(CustomRoles.Totocalcio);
                     Totocalcio.Add(killer.PlayerId);
                     break;
-                case 4:
+                case 3:
                     killer.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Imitator), GetString("RememberedMaverick")));
                     killer.RpcSetCustomRole(CustomRoles.Maverick);
                     Maverick.Add(killer.PlayerId);
                     break;
-                case 5:
+                case 4:
                     killer.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Imitator), GetString("RememberedAmnesiac")));
                     killer.RpcSetCustomRole(CustomRoles.Amnesiac);
                     Amnesiac.Add(killer.PlayerId);
@@ -210,7 +205,7 @@ public static class Imitator
         if (player.Is(CustomRoles.Pelican) && target.Is(CustomRoles.Pelican)) return true;
         if (player.Is(CustomRoles.Refugee) && target.Is(CustomRoles.Refugee)) return true;
         if (player.Is(CustomRoles.Parasite) && target.Is(CustomRoles.Parasite)) return true;
-        if (player.Is(CustomRoles.NSerialKiller) && target.Is(CustomRoles.NSerialKiller)) return true;
+        if (player.Is(CustomRoles.SerialKiller) && target.Is(CustomRoles.SerialKiller)) return true;
         if (player.Is(CustomRoles.Pickpocket) && target.Is(CustomRoles.Pickpocket)) return true;
         if (player.Is(CustomRoles.Traitor) && target.Is(CustomRoles.Traitor)) return true;
         if (player.Is(CustomRoles.Virus) && target.Is(CustomRoles.Virus)) return true;

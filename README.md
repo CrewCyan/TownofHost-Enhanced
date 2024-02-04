@@ -1,5 +1,5 @@
 
-<h1 align="center">Town of Host: Enhanced</h1>
+<h1 align="center">Town of Host: Enhanced (TOHE)</h1>
 
 <br>
 
@@ -87,7 +87,7 @@
 > - Provided role: Swapper
 ### :star: [Stellar Roles](https://github.com/Mr-Fluuff/StellarRolesAU)
 >
-> - Provided role: ParityCop (Inspector)
+> - Provided role: Inspector (Inspector)
 
 ---
 

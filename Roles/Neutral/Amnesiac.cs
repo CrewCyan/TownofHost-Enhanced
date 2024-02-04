@@ -7,23 +7,22 @@ namespace TOHE.Roles.Neutral;
 public static class Amnesiac
 {
     private static readonly int Id = 12700;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     public static OptionItem RememberCooldown;
     public static OptionItem RefugeeKillCD;
     public static OptionItem IncompatibleNeutralMode;
     public static readonly string[] amnesiacIncompatibleNeutralMode =
-    {
+    [
         "Role.Amnesiac",
-        "Role.Witch",
         "Role.Pursuer",
         "Role.Follower",
         "Role.Maverick",
         "Role.Imitator",
-    };
+    ];
 
-    private static Dictionary<byte, int> RememberLimit = new();
+    private static Dictionary<byte, int> RememberLimit = [];
 
     public static void SetupCustomOption()
     {
@@ -36,8 +35,8 @@ public static class Amnesiac
     }
     public static void Init()
     {
-        playerIdList = new();
-        RememberLimit = new();
+        playerIdList = [];
+        RememberLimit = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -84,7 +83,7 @@ public static class Amnesiac
         if (player.Is(CustomRoles.Pelican) && target.Is(CustomRoles.Pelican)) return true;
         if (player.Is(CustomRoles.Refugee) && target.Is(CustomRoles.Refugee)) return true;
         if (player.Is(CustomRoles.Parasite) && target.Is(CustomRoles.Parasite)) return true;
-        if (player.Is(CustomRoles.NSerialKiller) && target.Is(CustomRoles.NSerialKiller)) return true;
+        if (player.Is(CustomRoles.SerialKiller) && target.Is(CustomRoles.SerialKiller)) return true;
         if (player.Is(CustomRoles.Pickpocket) && target.Is(CustomRoles.Pickpocket)) return true;
         if (player.Is(CustomRoles.Traitor) && target.Is(CustomRoles.Traitor)) return true;
         if (player.Is(CustomRoles.Virus) && target.Is(CustomRoles.Virus)) return true;

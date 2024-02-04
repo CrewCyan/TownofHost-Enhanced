@@ -44,10 +44,10 @@ public static class Options
 
     // Presets
     private static readonly string[] presets =
-    {
+    [
         Main.Preset1.Value, Main.Preset2.Value, Main.Preset3.Value,
         Main.Preset4.Value, Main.Preset5.Value
-    };
+    ];
 
     // Custom Game Mode
     public static OptionItem GameMode;
@@ -60,13 +60,13 @@ public static class Options
         };
 
     public static readonly string[] gameModes =
-    {
+    [
         "Standard",
         "FFA",
 
 
         "Hide&SeekTOHE", // HidenSeekTOHE must be after other game modes
-    };
+    ];
 
     // 役職数・確率
     public static Dictionary<CustomRoles, int> roleCounts;
@@ -75,33 +75,35 @@ public static class Options
     public static Dictionary<CustomRoles, StringOptionItem> CustomRoleSpawnChances;
     public static Dictionary<CustomRoles, IntegerOptionItem> CustomAdtRoleSpawnRate;
     public static readonly string[] rates =
-    {
+    [
         "Rate0",  "Rate5",  "Rate10", "Rate20", "Rate30", "Rate40",
         "Rate50", "Rate60", "Rate70", "Rate80", "Rate90", "Rate100",
-    };
+    ];
     public static readonly string[] ratesZeroOne =
-    {
+    [
         "RoleOff", /*"Rate10", "Rate20", "Rate30", "Rate40", "Rate50",
         "Rate60", "Rate70", "Rate80", "Rate90", */"RoleRate",
-    };
+    ];
     public static readonly string[] ratesToggle =
-    {
+    [
         "RoleOff", "RoleRate", "RoleOn"
-    };
+    ];
     public static readonly string[] CheatResponsesName =
-    {
+    [
         "Ban", "Kick", "NoticeMe","NoticeEveryone", "TempBan", "OnlyCancel"
-    };
+    ];
     public static readonly string[] ConfirmEjectionsMode =
-    {
+    [
         "ConfirmEjections.None",
         "ConfirmEjections.Team",
         "ConfirmEjections.Role"
-    };
+    ];
     public static readonly string[] CamouflageMode =
-    {
+    [
         "CamouflageMode.Default",
         "CamouflageMode.Host",
+        "CamouflageMode.Random",
+        "CamouflageMode.OnlyRandomColor",
         "CamouflageMode.Karpe",
         "CamouflageMode.Lauryn",
         "CamouflageMode.Moe",
@@ -109,7 +111,7 @@ public static class Options
         "CamouflageMode.ryuk",
         "CamouflageMode.Gurge44",
         "CamouflageMode.TommyXL"
-    };
+    ];
 
     // 各役職の詳細設定
     //public static OptionItem EnableGM;
@@ -118,7 +120,6 @@ public static class Options
 
 
     // ------------ System Settings Tab ------------
-    public static OptionItem TemporaryAntiBlackoutFix;
     public static OptionItem GradientTagsOpt;
     public static OptionItem EnableKillerLeftCommand;
     public static OptionItem SeeEjectedRolesInMeeting;
@@ -127,6 +128,7 @@ public static class Options
     public static OptionItem TempBanLowLevelPlayer;
 
     public static OptionItem ApplyAllowList;
+    public static OptionItem AllowOnlyWhiteList;
 
     public static OptionItem KickOtherPlatformPlayer;
     public static OptionItem OptKickAndroidPlayer;
@@ -183,6 +185,7 @@ public static class Options
     public static OptionItem HideGameSettings;
 
     public static OptionItem PlayerCanSetColor;
+    public static OptionItem PlayerCanSetName;
     public static OptionItem PlayerCanUseQuitCommand;
     public static OptionItem FormatNameMode;
     public static OptionItem DisableEmojiName;
@@ -192,6 +195,7 @@ public static class Options
 
     public static OptionItem NoGameEnd;
     public static OptionItem AllowConsole;
+    public static OptionItem DisableAntiBlackoutProtects;
 
     public static OptionItem RoleAssigningAlgorithm;
     public static OptionItem KPDCamouflageMode;
@@ -538,8 +542,8 @@ public static class Options
     public static OptionItem VindicatorAdditionalVote;
     public static OptionItem VindicatorHideVote;
 
-    public static OptionItem EscapeeSSDuration;
-    public static OptionItem EscapeeSSCD;
+    public static OptionItem EscapistSSDuration;
+    public static OptionItem EscapistSSCD;
 
     public static OptionItem MinerSSDuration;
     public static OptionItem MinerSSCD;
@@ -919,42 +923,42 @@ public static class Options
     public static VoteMode GetWhenNonVote() => (VoteMode)WhenNonVote.GetValue();
 
     public static readonly string[] voteModes =
-    {
+    [
         "Default", "Suicide", "SelfVote", "Skip"
-    };
+    ];
     public static readonly string[] tieModes =
-    {
+    [
         "TieMode.Default", "TieMode.All", "TieMode.Random"
-    };
+    ];
     /* public static readonly string[] addonGuessModeCrew =
      {
          "GuesserMode.All", "GuesserMode.Harmful", "GuesserMode.Random"
      }; */
     public static readonly string[] madmateSpawnMode =
-    {
+    [
         "MadmateSpawnMode.Assign",
         "MadmateSpawnMode.FirstKill",
         "MadmateSpawnMode.SelfVote",
-    };
+    ];
     public static readonly string[] madmateCountMode =
-    {
+    [
         "MadmateCountMode.None",
         "MadmateCountMode.Imp",
         "MadmateCountMode.Original",
-    };
+    ];
     public static readonly string[] sidekickCountMode =
-    {
+    [
         "SidekickCountMode.Jackal",
         "SidekickCountMode.None",
         "SidekickCountMode.Original",
-    };
+    ];
     public static readonly string[] GodfatherChangeMode =
-    {
+    [
         "GodfatherCount.Refugee",
         "GodfatherCount.Madmate"
-    };
+    ];
     public static readonly string[] suffixModes =
-    {
+    [
         "SuffixMode.None",
         "SuffixMode.Version",
         "SuffixMode.Streaming",
@@ -963,21 +967,22 @@ public static class Options
         "SuffixMode.OriginalName",
         "SuffixMode.DoNotKillMe",
         "SuffixMode.NoAndroidPlz",
-        "SuffixMode.AutoHost"    };
+        "SuffixMode.AutoHost"    
+    ];
     public static readonly string[] roleAssigningAlgorithms =
-    {
+    [
         "RoleAssigningAlgorithm.Default",
         "RoleAssigningAlgorithm.NetRandom",
         "RoleAssigningAlgorithm.HashRandom",
         "RoleAssigningAlgorithm.Xorshift",
         "RoleAssigningAlgorithm.MersenneTwister",
-    };
+    ];
     public static readonly string[] formatNameModes =
-    {
+    [
         "FormatNameModes.None",
         "FormatNameModes.Color",
         "FormatNameModes.Snacks",
-    };
+    ];
     public static SuffixModes GetSuffixMode() => (SuffixModes)SuffixMode.GetValue();
 
 
@@ -1039,8 +1044,8 @@ public static class Options
     }
     public static void ResetRoleCounts()
     {
-        roleCounts = new Dictionary<CustomRoles, int>();
-        roleSpawnChances = new Dictionary<CustomRoles, float>();
+        roleCounts = [];
+        roleSpawnChances = [];
 
         foreach (var role in CustomRolesHelper.AllRoles)
         {
@@ -1083,9 +1088,12 @@ public static class Options
     public static void Load()
     {
         //#######################################
-        // 27200 lasted id for roles/add-ons (Next use 27300)
+        // 27700 lasted id for roles/add-ons (Next use 27800)
         // Limit id for  roles/add-ons --- "59999"
         //#######################################
+
+        // You can use: 13800 (Was for NWitch)
+
 
         // Start Load Settings
         if (IsLoaded) return;
@@ -1102,9 +1110,9 @@ public static class Options
 
 
         #region Roles/Add-ons Settings
-        CustomRoleCounts = new();
-        CustomRoleSpawnChances = new();
-        CustomAdtRoleSpawnRate = new();
+        CustomRoleCounts = [];
+        CustomRoleSpawnChances = [];
+        CustomAdtRoleSpawnRate = [];
 
         // GM
         //EnableGM = BooleanOptionItem.Create(60001, "GM", false, TabGroup.GameSettings, false)
@@ -1203,7 +1211,7 @@ public static class Options
         /*
          * Arrogance
          */
-        Sans.SetupCustomOption();
+        Arrogance.SetupCustomOption();
 
         /*
          * Berserker
@@ -1266,6 +1274,11 @@ public static class Options
         BountyHunter.SetupCustomOption();
 
         /*
+         * Butcher
+         */
+        OverKiller.SetupCustomOption();
+
+        /*
          * Chronomancer
          */
         Chronomancer.SetupCustomOption();
@@ -1318,6 +1331,11 @@ public static class Options
         Greedier.SetupCustomOption();
 
         /*
+         * Hangman
+         */
+        Hangman.SetupCustomOption();
+
+        /*
          * Inhibitor
          */
         SetupRoleOptions(1600, TabGroup.ImpostorRoles, CustomRoles.Inhibitor);
@@ -1329,6 +1347,14 @@ public static class Options
          * Instigator
          */
         Instigator.SetupCustomOption();
+
+        /*
+         * Killing Machine
+         */
+        SetupRoleOptions(23800, TabGroup.ImpostorRoles, CustomRoles.KillingMachine);
+        MNKillCooldown = FloatOptionItem.Create(23805, "KillCooldown", new(2.5f, 180f, 2.5f), 10f, TabGroup.ImpostorRoles, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.KillingMachine])
+            .SetValueFormat(OptionFormat.Seconds);
 
         /*
          * Ludopath
@@ -1348,7 +1374,7 @@ public static class Options
         /*
          * Mercenary
          */
-        SerialKiller.SetupCustomOption();
+        Mercenary.SetupCustomOption();
 
         /*
          * Ninja
@@ -1404,6 +1430,17 @@ public static class Options
             .SetValueFormat(OptionFormat.Seconds);
 
         /*
+         * Zombie
+         */
+        SetupRoleOptions(23900, TabGroup.ImpostorRoles, CustomRoles.Zombie);
+        ZombieKillCooldown = FloatOptionItem.Create(23903, "KillCooldown", new(0f, 180f, 2.5f), 5f, TabGroup.ImpostorRoles, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Zombie])
+            .SetValueFormat(OptionFormat.Seconds);
+        ZombieSpeedReduce = FloatOptionItem.Create(23904, "ZombieSpeedReduce", new(0.0f, 1.0f, 0.1f), 0.1f, TabGroup.ImpostorRoles, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Zombie])
+            .SetValueFormat(OptionFormat.Multiplier);
+
+        /*
          * SUPPORT ROLES
          */
         TextOptionItem.Create(10000002, "RoleType.ImpSupport", TabGroup.ImpostorRoles)
@@ -1414,6 +1451,11 @@ public static class Options
          * Anti Adminer
          */
         AntiAdminer.SetupCustomOption();
+
+        /*
+         * Blackmailer
+        */
+        Blackmailer.SetupCustomOption();
 
         /*
          * Camouflager
@@ -1439,7 +1481,7 @@ public static class Options
         /*
          * Fireworker
          */
-        FireWorks.SetupCustomOption();
+        Fireworker.SetupCustomOption();
 
         /*
          * Gangster
@@ -1509,13 +1551,18 @@ public static class Options
         /*
          * Escapist
          */
-        SetupRoleOptions(4000, TabGroup.ImpostorRoles, CustomRoles.Escapee);
-        EscapeeSSDuration = FloatOptionItem.Create(4002, "ShapeshiftDuration", new(1f, 180f, 1f), 1, TabGroup.ImpostorRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Escapee])
+        SetupRoleOptions(4000, TabGroup.ImpostorRoles, CustomRoles.Escapist);
+        EscapistSSDuration = FloatOptionItem.Create(4002, "ShapeshiftDuration", new(1f, 180f, 1f), 1, TabGroup.ImpostorRoles, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Escapist])
             .SetValueFormat(OptionFormat.Seconds);
-        EscapeeSSCD = FloatOptionItem.Create(4003, "ShapeshiftCooldown", new(1f, 180f, 1f), 5f, TabGroup.ImpostorRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Escapee])
+        EscapistSSCD = FloatOptionItem.Create(4003, "ShapeshiftCooldown", new(1f, 180f, 1f), 5f, TabGroup.ImpostorRoles, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Escapist])
             .SetValueFormat(OptionFormat.Seconds);
+
+        /*
+         * Lightning
+         */
+        BallLightning.SetupCustomOption();
 
         /*
          * Mastermind
@@ -1617,7 +1664,7 @@ public static class Options
         /*
          * Anonymous
          */
-        Hacker.SetupCustomOption();
+        Anonymous.SetupCustomOption();
 
         /*
          * Dazzler
@@ -1625,14 +1672,29 @@ public static class Options
         Dazzler.SetupCustomOption();
 
         /*
+         * Stealth
+         */
+        Stealth.SetupCustomOption();
+
+        /*
          * Devourer
          */
         Devourer.SetupCustomOption();
 
         /*
+         * Eraser
+         */
+        Eraser.SetupCustomOption();
+
+        /*
          * Pitfall
          */
         Pitfall.SetupCustomOption();
+
+        /*
+         * Penguin
+         */
+        Penguin.SetupCustomOption();
 
         /*
          * Twister
@@ -1879,9 +1941,14 @@ public static class Options
             .SetValueFormat(OptionFormat.Times);
 
         /*
-         * ParityCop
+         * Inspector
          */
-        ParityCop.SetupCustomOption();
+        Inspector.SetupCustomOption();
+
+        /*
+         * Investigator
+         */
+        Investigator.SetupCustomOption();
 
         /*
          *  Keeper
@@ -1939,7 +2006,7 @@ public static class Options
         /*
          * Observer
          */
-        SetupRoleOptions(9000, TabGroup.CrewmateRoles, CustomRoles.Observer);
+        Observer.SetupCustomOption();
 
         /*
          * Oracle
@@ -2108,6 +2175,8 @@ public static class Options
             .SetGameMode(CustomGameMode.Standard)
             .SetColor(new Color32(140, 255, 255, byte.MaxValue));
 
+        Admirer.SetupCustomOption();
+
         Captain.SetupCustomOption();
 
         CopyCat.SetupCustomOption();
@@ -2160,7 +2229,7 @@ public static class Options
 
         Totocalcio.SetupCustomOption();
 
-        FFF.SetupCustomOption();
+        Hater.SetupCustomOption();
 
         Imitator.SetupCustomOption();
 
@@ -2177,14 +2246,14 @@ public static class Options
 
         Romantic.SetupCustomOption();
 
+        SchrodingersCat.SetupCustomOption();
+
         SetupRoleOptions(13600, TabGroup.NeutralRoles, CustomRoles.Shaman);
         VoodooCooldown = FloatOptionItem.Create(13602, "VoodooCooldown", new(0f, 180f, 2.5f), 20f, TabGroup.NeutralRoles, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Shaman])
             .SetValueFormat(OptionFormat.Seconds);
 
         Taskinator.SetupCustomOption();
-
-        NWitch.SetupCustomOption();
 
 
         TextOptionItem.Create(10000012, "RoleType.NeutralEvil", TabGroup.NeutralRoles)
@@ -2265,7 +2334,12 @@ public static class Options
         RevolutionistVentCountDown = FloatOptionItem.Create(15206, "RevolutionistVentCountDown", new(1f, 180f, 1f), 15f, TabGroup.NeutralRoles, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Revolutionist])
             .SetValueFormat(OptionFormat.Seconds);
-        
+
+        /*
+         * Solsticer
+        */
+        Solsticer.SetupCustomOption();
+
         SoulCollector.SetupCustomOption();
         
         SetupRoleOptions(15400, TabGroup.NeutralRoles, CustomRoles.Terrorist);
@@ -2353,6 +2427,8 @@ public static class Options
 
         PlagueBearer.SetupCustomOption();
 
+        PlagueDoctor.SetupCustomOption();
+
         PotionMaster.SetupCustomOption();
 
         Pyromaniac.SetupCustomOption();
@@ -2360,7 +2436,7 @@ public static class Options
         if (!Quizmaster.InExperimental)
             Quizmaster.SetupCustomOption();
 
-        NSerialKiller.SetupCustomOption(); // Serial Killer
+        SerialKiller.SetupCustomOption(); // Serial Killer
 
         Shroud.SetupCustomOption();
 
@@ -2514,8 +2590,6 @@ public static class Options
             .SetParent(CustomRoleSpawnChances[CustomRoles.Overclocked])
             .SetValueFormat(OptionFormat.Percent);
         
-        Repairman.SetupCustomOption(); //Repairman
-        
         SetupAdtRoleOptions(20000, CustomRoles.Seer, canSetNum: true);
         ImpCanBeSeer = BooleanOptionItem.Create(20003, "ImpCanBeSeer", true, TabGroup.Addons, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Seer]);
@@ -2570,7 +2644,16 @@ public static class Options
             .SetParent(CustomRoleSpawnChances[CustomRoles.Unreportable]);
         NeutralCanBeUnreportable = BooleanOptionItem.Create(20505, "NeutralCanBeUnreportable", true, TabGroup.Addons, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Unreportable]);
-
+        /*
+         * Fool
+         */
+        SetupAdtRoleOptions(25600, CustomRoles.Fool, canSetNum: true, tab: TabGroup.Addons);
+        ImpCanBeFool = BooleanOptionItem.Create(25603, "ImpCanBeFool", true, TabGroup.Addons, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Fool]);
+        CrewCanBeFool = BooleanOptionItem.Create(25604, "CrewCanBeFool", true, TabGroup.Addons, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Fool]);
+        NeutralCanBeFool = BooleanOptionItem.Create(25605, "NeutralCanBeFool", true, TabGroup.Addons, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Fool]);
 
         SetupAdtRoleOptions(20600, CustomRoles.Fragile, canSetNum: true);
         ImpCanBeFragile = BooleanOptionItem.Create(20603, "ImpCanBeFragile", true, TabGroup.Addons, false)
@@ -2641,6 +2724,8 @@ public static class Options
             .SetParent(CustomRoleSpawnChances[CustomRoles.Unlucky]);
         NeutralCanBeUnlucky = BooleanOptionItem.Create(21010, "NeutralCanBeUnlucky", true, TabGroup.Addons, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Unlucky]);
+
+        Tired.SetupCustomOptions();
 
         SetupAdtRoleOptions(21100, CustomRoles.VoidBallot, canSetNum: true);
         ImpCanBeVoidBallot = BooleanOptionItem.Create(21103, "ImpCanBeVoidBallot", true, TabGroup.Addons, false)
@@ -2719,7 +2804,6 @@ public static class Options
         NeutralCanBeGravestone = BooleanOptionItem.Create(22105, "NeutralCanBeGravestone", true, TabGroup.Addons, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Gravestone]);
 
-        Susceptible.SetupCustomOptions();
         
         SetupAdtRoleOptions(22200, CustomRoles.Guesser, canSetNum: true, tab: TabGroup.Addons);
         ImpCanBeGuesser = BooleanOptionItem.Create(22203, "ImpCanBeGuesser", true, TabGroup.Addons, false)
@@ -2735,6 +2819,8 @@ public static class Options
         GTryHideMsg = BooleanOptionItem.Create(22208, "GuesserTryHideMsg", true, TabGroup.Addons, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Guesser])
             .SetColor(Color.green);
+
+        Oiiai.SetupCustomOptions();
 
         SetupAdtRoleOptions(22300, CustomRoles.Rebound, canSetNum: true, tab: TabGroup.Addons);
         ImpCanBeRebound = BooleanOptionItem.Create(22303, "ImpCanBeRebound", true, TabGroup.Addons, false)
@@ -2762,6 +2848,7 @@ public static class Options
         NeutralCanBeStubborn = BooleanOptionItem.Create(22505, "NeutralCanBeStubborn", true, TabGroup.Addons, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Stubborn]);
 
+        Susceptible.SetupCustomOptions();
 
         TextOptionItem.Create(10000018, "RoleType.Impostor", TabGroup.Addons) // IMPOSTOR
             .SetGameMode(CustomGameMode.Standard)
@@ -2831,7 +2918,12 @@ public static class Options
         
         SetupAdtRoleOptions(23300, CustomRoles.Swift, canSetNum: true, tab: TabGroup.Addons);
 
-      //SetupAdtRoleOptions(23400, CustomRoles.Minimalism, canSetNum: true, tab: TabGroup.Addons);
+        /*
+         * Tricky
+         */
+        Tricky.SetupCustomOption();
+
+      //SetupAdtRoleOptions(23400, CustomRoles.KillingMachine, canSetNum: true, tab: TabGroup.Addons);
 
 
         TextOptionItem.Create(10000019, "RoleType.Misc", TabGroup.Addons) // NEUTRAL
@@ -2851,6 +2943,8 @@ public static class Options
         SetupLoversRoleOptionsToggle(23600);
         
         SetupAdtRoleOptions(23700, CustomRoles.Reach, canSetNum: true);
+
+        Rainbow.SetupCustomOptions();
         
         Workhorse.SetupCustomOption();
 
@@ -2861,35 +2955,13 @@ public static class Options
             .SetGameMode(CustomGameMode.Standard)
             .SetColor(new Color32(247, 70, 49, byte.MaxValue));
 
-        SetupRoleOptions(23800, TabGroup.OtherRoles, CustomRoles.Minimalism);
-        MNKillCooldown = FloatOptionItem.Create(23805, "KillCooldown", new(2.5f, 180f, 2.5f), 10f, TabGroup.OtherRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Minimalism])
-            .SetValueFormat(OptionFormat.Seconds);
         
-        SetupRoleOptions(23900, TabGroup.OtherRoles, CustomRoles.Zombie);
-        ZombieKillCooldown = FloatOptionItem.Create(23903, "KillCooldown", new(0f, 180f, 2.5f), 5f, TabGroup.OtherRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Zombie])
-            .SetValueFormat(OptionFormat.Seconds);
-        ZombieSpeedReduce = FloatOptionItem.Create(23904, "ZombieSpeedReduce", new(0.0f, 1.0f, 0.1f), 0.1f, TabGroup.OtherRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Zombie])
-            .SetValueFormat(OptionFormat.Multiplier);
-
         /*SetupRoleOptions(24000, TabGroup.OtherRoles, CustomRoles.Capitalism);
         CapitalismSkillCooldown = FloatOptionItem.Create(24003, "CapitalismSkillCooldown", new(2.5f, 180f, 2.5f), 20f, TabGroup.OtherRoles, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Capitalism])
             .SetValueFormat(OptionFormat.Seconds);*/
-
-        BallLightning.SetupCustomOption();
         
-        Eraser.SetupCustomOption();
-        
-        OverKiller.SetupCustomOption();
-        
-        Disperser.SetupCustomOption();
-        
-        Hangman.SetupCustomOption();
-        
-        Blackmailer.SetupCustomOption();
+        Disperser.SetupCustomOption();        
 
         // 船员
         TextOptionItem.Create(10000021, "OtherRoles.CrewmateRoles", TabGroup.OtherRoles)
@@ -2905,11 +2977,7 @@ public static class Options
             .SetValueFormat(OptionFormat.Times); */
 
         //Divinator.SetupCustomOption();
-
-        Admirer.SetupCustomOption();
-        
-        Investigator.SetupCustomOption();
-        
+                
         // 中立
         TextOptionItem.Create(10000022, "OtherRoles.NeutralRoles", TabGroup.OtherRoles)
             .SetGameMode(CustomGameMode.Standard)
@@ -2928,8 +2996,6 @@ public static class Options
 
         Spiritcaller.SetupCustomOption();
 
-        Solsticer.SetupCustomOption();
-
         // 副职
         TextOptionItem.Create(10000023, "OtherRoles.Addons", TabGroup.OtherRoles)
             .SetGameMode(CustomGameMode.Standard)
@@ -2939,23 +3005,10 @@ public static class Options
 
         SetupAdtRoleOptions(25500, CustomRoles.Youtuber, canSetNum: true, tab: TabGroup.OtherRoles);
         
-        SetupAdtRoleOptions(25600, CustomRoles.Fool, canSetNum: true, tab: TabGroup.OtherRoles);
-        ImpCanBeFool = BooleanOptionItem.Create(25603, "ImpCanBeFool", true, TabGroup.OtherRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Fool]);
-        CrewCanBeFool = BooleanOptionItem.Create(25604, "CrewCanBeFool", true, TabGroup.OtherRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Fool]);
-        NeutralCanBeFool = BooleanOptionItem.Create(25605, "NeutralCanBeFool", true, TabGroup.OtherRoles, false)
-            .SetParent(CustomRoleSpawnChances[CustomRoles.Fool]);
-
-        Oiiai.SetupCustomOptions();
 
         #endregion
 
         #region System Settings
-        TemporaryAntiBlackoutFix = BooleanOptionItem.Create(60030, "TemporaryAntiBlackoutFix", true, TabGroup.SystemSettings, false)
-            .SetGameMode(CustomGameMode.Standard)
-            .SetHeader(true)
-            .SetColor(Color.red);
         GradientTagsOpt = BooleanOptionItem.Create(60031, "EnableGadientTags", false, TabGroup.SystemSettings, false)
             .SetHeader(true);
         EnableKillerLeftCommand = BooleanOptionItem.Create(60040, "EnableKillerLeftCommand", true, TabGroup.SystemSettings, false)
@@ -2972,6 +3025,8 @@ public static class Options
             .SetParent(KickLowLevelPlayer)
             .SetValueFormat(OptionFormat.Times);
         ApplyAllowList = BooleanOptionItem.Create(60060, "ApplyWhiteList", false, TabGroup.SystemSettings, false);
+        AllowOnlyWhiteList = BooleanOptionItem.Create(60061, "AllowOnlyWhiteList", false, TabGroup.SystemSettings, false);
+
         KickOtherPlatformPlayer = BooleanOptionItem.Create(60070, "KickOtherPlatformPlayer", false, TabGroup.SystemSettings, false);
         OptKickAndroidPlayer = BooleanOptionItem.Create(60071, "OptKickAndroidPlayer", false, TabGroup.SystemSettings, false)
             .SetParent(KickOtherPlatformPlayer);
@@ -3052,6 +3107,7 @@ public static class Options
         //DIYGameSettings = BooleanOptionItem.Create(60320, "DIYGameSettings", false, TabGroup.SystemSettings, false);
         PlayerCanSetColor = BooleanOptionItem.Create(60330, "PlayerCanSetColor", false, TabGroup.SystemSettings, false);
         PlayerCanUseQuitCommand = BooleanOptionItem.Create(60331, "PlayerCanUseQuitCommand", false, TabGroup.SystemSettings, false);
+        PlayerCanSetName = BooleanOptionItem.Create(60332, "PlayerCanSetName", false, TabGroup.SystemSettings, false);
         FormatNameMode = StringOptionItem.Create(60340, "FormatNameMode", formatNameModes, 0, TabGroup.SystemSettings, false);
         DisableEmojiName = BooleanOptionItem.Create(60350, "DisableEmojiName", true, TabGroup.SystemSettings, false);
         ChangeNameToRoleInfo = BooleanOptionItem.Create(60360, "ChangeNameToRoleInfo", true, TabGroup.SystemSettings, false)
@@ -3062,8 +3118,12 @@ public static class Options
         NoGameEnd = BooleanOptionItem.Create(60380, "NoGameEnd", false, TabGroup.SystemSettings, false)
             .SetColor(Color.red)
             .SetHeader(true);
-        AllowConsole = BooleanOptionItem.Create(60390, "AllowConsole", false, TabGroup.SystemSettings, false)
+        AllowConsole = BooleanOptionItem.Create(60382, "AllowConsole", false, TabGroup.SystemSettings, false)
             .SetColor(Color.red);
+        DisableAntiBlackoutProtects = BooleanOptionItem.Create(60384, "DisableAntiBlackoutProtects", false, TabGroup.SystemSettings, false)
+            .SetGameMode(CustomGameMode.Standard)
+            .SetColor(Color.red);
+
         RoleAssigningAlgorithm = StringOptionItem.Create(60400, "RoleAssigningAlgorithm", roleAssigningAlgorithms, 4, TabGroup.SystemSettings, true)
             .RegisterUpdateValueEvent((object obj, OptionItem.UpdateValueEventArgs args) => IRandom.SetInstanceById(args.CurrentValue))
             .SetHeader(true);
@@ -3868,7 +3928,7 @@ public static class Options
     }
     public class OverrideTasksData
     {
-        public static Dictionary<CustomRoles, OverrideTasksData> AllData = new();
+        public static Dictionary<CustomRoles, OverrideTasksData> AllData = [];
         public CustomRoles Role { get; private set; }
         public int IdStart { get; private set; }
         public OptionItem doOverride;

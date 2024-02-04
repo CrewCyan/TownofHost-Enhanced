@@ -10,7 +10,7 @@ namespace TOHE.Roles.Impostor;
 public static class BountyHunter
 {
     private static readonly int Id = 800;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     private static OptionItem OptionTargetChangeTime;
@@ -23,8 +23,8 @@ public static class BountyHunter
     private static float FailureKillCooldown;
     private static bool ShowTargetArrow;
 
-    public static Dictionary<byte, byte> Targets = new();
-    public static Dictionary<byte, float> ChangeTimer = new();
+    public static Dictionary<byte, byte> Targets = [];
+    public static Dictionary<byte, float> ChangeTimer = [];
 
     public static void SetupCustomOption()
     {
@@ -39,11 +39,11 @@ public static class BountyHunter
     }
     public static void Init()
     {
-        playerIdList = new();
+        playerIdList = [];
         IsEnable = false;
 
-        Targets = new();
-        ChangeTimer = new();
+        Targets = [];
+        ChangeTimer = [];
     }
     public static void Add(byte playerId)
     {
@@ -130,7 +130,7 @@ public static class BountyHunter
     public static byte GetTarget(PlayerControl player)
     {
         if (player == null) return 0xff;
-        if (Targets == null) Targets = new();
+        Targets ??= [];
 
         if (!Targets.TryGetValue(player.PlayerId, out var targetId))
             targetId = ResetTarget(player);
@@ -213,8 +213,6 @@ public static class BountyHunter
     public static void SetAbilityButtonText(HudManager __instance) => __instance.AbilityButton.OverrideText(GetString("BountyHunterChangeButtonText"));
     public static void AfterMeetingTasks()
     {
-        if (!IsEnable) return;
-
         foreach (var id in playerIdList.ToArray())
         {
             if (!Main.PlayerStates[id].IsDead)

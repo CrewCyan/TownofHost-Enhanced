@@ -16,6 +16,7 @@ public class ErrorText : MonoBehaviour
         }
     }
     private static ErrorText _instance;
+
     private void Awake()
     {
         if (_instance != null)
@@ -45,7 +46,7 @@ public class ErrorText : MonoBehaviour
 
     public TMPro.TextMeshPro Text;
     public Camera Camera;
-    public List<ErrorData> AllErrors = new();
+    public List<ErrorData> AllErrors = [];
     public Vector3 TextOffset = new(0, 0.3f, -1000f);
     public void Update()
     {
@@ -150,7 +151,7 @@ public enum ErrorCode
 {
     //xxxyyyz: ERR-xxx-yyy-z
     //  xxx: エラー大まかなの種類 (HUD関連, 追放処理関連など)
-    //  yyy: エラーの詳細な種類 (BoutyHunterの処理, SerialKillerの処理など)
+    //  yyy: エラーの詳細な種類 (BoutyHunterの処理, Mercenaryの処理など)
     //  z:   深刻度
     //    0: 処置不要 (非表示)
     //    1: 正常に動作しなければ廃村 (一定時間で非表示)

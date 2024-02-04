@@ -13,13 +13,11 @@ public static class Kamikaze
     public static bool IsEnable = false;
 
 
-    public static Dictionary<byte, byte> KamikazedList = new();
+    public static Dictionary<byte, byte> KamikazedList = [];
     private static OptionItem KillCooldown;
     private static OptionItem OptMaxMarked;
-    public static Dictionary<byte, int> MarkedLim = new();
-
+    public static Dictionary<byte, int> MarkedLim = [];
     //public static bool CheckKamiDeath = false;
-
 
 
     public static void SetupCustomOption()
@@ -33,8 +31,8 @@ public static class Kamikaze
     }
     public static void Init()
     {
-        MarkedLim = new();
-        KamikazedList = new();
+        MarkedLim = [];
+        KamikazedList = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -82,7 +80,7 @@ public static class Kamikaze
         if (!kamikameha.IsAlive())
         {
             KamikazedList.Remove(kamikameha.PlayerId);
-            SendRPC(KamiId: KamikazedList[kamikameha.PlayerId], targetId:kamikameha.PlayerId, checkMurder:false); // to remove playerid
+            SendRPC(KamiId: byte.MaxValue, targetId:kamikameha.PlayerId, checkMurder:false); // to remove playerid
             return;
         }
         var kami = Utils.GetPlayerById(KamikazedList[kamikameha.PlayerId]);
@@ -92,6 +90,7 @@ public static class Kamikaze
             if (kamikameha.IsAlive())
             {
                 Main.PlayerStates[kamikameha.PlayerId].deathReason = PlayerState.DeathReason.Targeted;
+                kamikameha.SetRealKiller(kami);
                 kamikameha.RpcMurderPlayerV3(kamikameha);
                 // Logger.Info($"{alivePlayer.GetNameWithRole()} is the killer of {kamikameha.GetNameWithRole()}", "Kamikaze"); -- Works fine
             }

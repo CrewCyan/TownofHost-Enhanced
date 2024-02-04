@@ -2,7 +2,6 @@ using AmongUs.Data;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace TOHE;
@@ -12,7 +11,7 @@ class ChatControllerUpdatePatch
 {
     public static int CurrentHistorySelection = -1;
 
-    static Dictionary<string, string> replaceDic = new()
+    static readonly Dictionary<string, string> replaceDic = new()
             {
                 { "（", " (" },
                 { "）", ") " },
@@ -35,6 +34,7 @@ class ChatControllerUpdatePatch
     public static void Postfix(ChatController __instance)
     {
         if (!__instance.freeChatField.textArea.hasFocus) return;
+        if (!GameStates.IsModHost) return;
         __instance.freeChatField.textArea.characterLimit = AmongUsClient.Instance.AmHost ? 999 : 300;
 
         if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.C))
@@ -57,7 +57,7 @@ class ChatControllerUpdatePatch
                     int remainingLength = __instance.freeChatField.textArea.characterLimit - __instance.freeChatField.textArea.text.Length;
                     if (remainingLength > 0)
                     {
-                        string text = replacedText.Substring(0, remainingLength);
+                        string text = replacedText[..remainingLength];
                         __instance.freeChatField.textArea.SetText(__instance.freeChatField.textArea.text + text);
                     }
                 }

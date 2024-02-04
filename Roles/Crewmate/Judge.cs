@@ -14,7 +14,7 @@ namespace TOHE.Roles.Crewmate;
 public static class Judge
 {
     private static readonly int Id = 10700;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     public static OptionItem TrialLimitPerMeeting;
@@ -51,8 +51,8 @@ public static class Judge
     }
     public static void Init()
     {
-        playerIdList = new();
-        TrialLimit = new();
+        playerIdList = [];
+        TrialLimit = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -60,6 +60,11 @@ public static class Judge
         playerIdList.Add(playerId);
         TrialLimit.Add(playerId, TrialLimitPerMeeting.GetInt());
         IsEnable = true;
+    }
+    public static void Remove(byte playerId)
+    {
+        playerIdList.Remove(playerId);
+        TrialLimit.Remove(playerId);
     }
     public static void OnReportDeadBody()
     {
@@ -265,7 +270,7 @@ public static class Judge
         TrialMsg(pc, $"/tl {PlayerId}", true);
     }
 
-    private static void JudgeOnClick(byte playerId, MeetingHud __instance)
+    private static void JudgeOnClick(byte playerId /*, MeetingHud __instance*/)
     {
         Logger.Msg($"Click: ID {playerId}", "Judge UI");
         var pc = Utils.GetPlayerById(playerId);
@@ -297,7 +302,7 @@ public static class Judge
             renderer.sprite = CustomButton.Get("JudgeIcon");
             PassiveButton button = targetBox.GetComponent<PassiveButton>();
             button.OnClick.RemoveAllListeners();
-            button.OnClick.AddListener((Action)(() => JudgeOnClick(pva.TargetPlayerId, __instance)));
+            button.OnClick.AddListener((Action)(() => JudgeOnClick(pva.TargetPlayerId/*, __instance*/)));
         }
     }
 }

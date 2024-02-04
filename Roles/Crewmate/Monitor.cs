@@ -13,7 +13,7 @@ namespace TOHE.Roles.Crewmate;
 internal class Monitor
 {
     private static readonly int Id = 12500;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     private static OptionItem CanCheckCamera;
@@ -31,7 +31,7 @@ internal class Monitor
     }
     public static void Init()
     {
-        playerIdList = new();
+        playerIdList = [];
         IsAdminWatch = false;
         IsVitalWatch = false;
         IsDoorLogWatch = false;
@@ -42,6 +42,10 @@ internal class Monitor
     {
         playerIdList.Add(playerId);
         IsEnable = true;
+    }
+    public static void Remove(byte playerId)
+    {
+        playerIdList.Remove(playerId);
     }
 
     private static int Count = 0;

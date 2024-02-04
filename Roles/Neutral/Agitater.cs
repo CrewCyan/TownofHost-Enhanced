@@ -9,7 +9,7 @@ namespace TOHE.Roles.Neutral;
 public static class Agitater
 {
     private static readonly int Id = 15800;
-    public static List<byte> playerIdList = new();
+    public static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     public static OptionItem BombExplodeCooldown;
@@ -41,7 +41,7 @@ public static class Agitater
     }
     public static void Init()
     {
-        playerIdList = new();
+        playerIdList = [];
         CurrentBombedPlayer = byte.MaxValue;
         LastBombedPlayer = byte.MaxValue;
         AgitaterHasBombed = false;
@@ -136,7 +136,7 @@ public static class Agitater
         else
         {
             var playerPos = player.GetCustomPosition();
-            Dictionary<byte, float> targetDistance = new();
+            Dictionary<byte, float> targetDistance = [];
             float dis;
 
             foreach (var target in Main.AllAlivePlayerControls)
@@ -153,15 +153,14 @@ public static class Agitater
                 var min = targetDistance.OrderBy(c => c.Value).FirstOrDefault();
                 var target = Utils.GetPlayerById(min.Key);
                 var KillRange = GameOptionsData.KillDistances[Mathf.Clamp(GameOptionsManager.Instance.currentNormalGameOptions.KillDistance, 0, 2)];
-
-                if (min.Value <= KillRange && player.CanMove && target.CanMove)
+                if (min.Value <= KillRange && !player.inVent && !target.inVent)
                 {
                     PassBomb(player, target);
                 }
             }
         }
     }
-    private static void PassBomb(PlayerControl player, PlayerControl target, bool IsAgitater = false)
+    private static void PassBomb(PlayerControl player, PlayerControl target)
     {
         if (!AgitaterHasBombed) return;
         if (target.Data.IsDead) return;

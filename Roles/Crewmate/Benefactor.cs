@@ -9,13 +9,13 @@ namespace TOHE.Roles.Crewmate;
 public static class Benefactor
 {
     private static readonly int Id = 26400;
-    //private static List<byte> playerIdList = new();
+    //private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
-    public static Dictionary<byte, List<int>> taskIndex = new();
-    public static Dictionary<byte, int> TaskMarkPerRound = new();
+    public static Dictionary<byte, List<int>> taskIndex = [];
+    public static Dictionary<byte, int> TaskMarkPerRound = [];
     private static int maxTasksMarkedPerRound = new();
-    public static Dictionary<byte, long> shieldedPlayers = new();
+    public static Dictionary<byte, long> shieldedPlayers = [];
 
     public static OptionItem TaskMarkPerRoundOpt;
     public static OptionItem ShieldDuration;
@@ -34,18 +34,21 @@ public static class Benefactor
 
     public static void Init()
     {
-        //playerIdList = new();
-        taskIndex = new();
-        shieldedPlayers = new();
-        TaskMarkPerRound = new();
+        //playerIdList = [];
+        taskIndex = [];
+        shieldedPlayers = [];
+        TaskMarkPerRound = [];
         IsEnable = false;
         maxTasksMarkedPerRound = TaskMarkPerRoundOpt.GetInt();
     }
     public static void Add(byte playerId)
     {
-        //playerIdList.Add(playerId);
         TaskMarkPerRound[playerId] = 0;
         IsEnable = true;
+    }
+    public static void Remove(byte playerId)
+    {
+        TaskMarkPerRound.Remove(playerId);
     }
 
     private static void SendRPC(int type, byte benefactorId = 0xff, byte targetId = 0xff, int taskIndex = -1)
@@ -93,14 +96,14 @@ public static class Benefactor
             int taskMarked = reader.ReadInt32();
             TaskMarkPerRound[benefactorId] = taskMarked;
             int taskInd = reader.ReadInt32();
-            if (!taskIndex.ContainsKey(benefactorId)) taskIndex[benefactorId] = new();
+            if (!taskIndex.ContainsKey(benefactorId)) taskIndex[benefactorId] = [];
             taskIndex[benefactorId].Add(taskInd);
         }
         if (type == 3)
         {
             byte benefactorId = reader.ReadByte();
             int taskInd = reader.ReadInt32();
-            if (!taskIndex.ContainsKey(benefactorId)) taskIndex[benefactorId] = new();
+            if (!taskIndex.ContainsKey(benefactorId)) taskIndex[benefactorId] = [];
             taskIndex[benefactorId].Remove(taskInd);
             byte targetId = reader.ReadByte();
             string stimeStamp = reader.ReadString();
@@ -123,7 +126,6 @@ public static class Benefactor
 
     public static void AfterMeetingTasks()
     {
-        if (!IsEnable) return;
         foreach (var playerId in TaskMarkPerRound.Keys.ToArray())
         {
             TaskMarkPerRound[playerId] = 0;
@@ -154,7 +156,7 @@ public static class Benefactor
                 return;
             }
             TaskMarkPerRound[playerId]++;
-            if (!taskIndex.ContainsKey(playerId)) taskIndex[playerId] = new();
+            if (!taskIndex.ContainsKey(playerId)) taskIndex[playerId] = [];
             taskIndex[playerId].Add(task.Index);
             SendRPC(type: 2, benefactorId: playerId, taskIndex: task.Index); //add in task mark per round and taskindex
             player.Notify(GetString("BenefactorTaskMarked"));
@@ -197,7 +199,6 @@ public static class Benefactor
 
     public static bool OnCheckMurder(PlayerControl killer, PlayerControl target)
     {
-        if (!IsEnable) return true;
         if (target == null || killer == null) return true;
         if (!shieldedPlayers.ContainsKey(target.PlayerId)) return true;
         if (ShieldIsOneTimeUse.GetBool())

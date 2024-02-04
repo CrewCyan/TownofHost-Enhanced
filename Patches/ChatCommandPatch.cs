@@ -13,9 +13,7 @@ using TOHE.Roles.Crewmate;
 using TOHE.Roles.Impostor;
 using TOHE.Roles.Neutral;
 using UnityEngine;
-using UnityEngine.TextCore;
 using static TOHE.Translator;
-using static UnityEngine.GraphicsBuffer;
 
 
 namespace TOHE;
@@ -23,13 +21,13 @@ namespace TOHE;
 [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendChat))]
 internal class ChatCommands
 {
-    private static string modLogFiles = @"./TOHE-DATA/ModLogs.txt";
-    private static string modTagsFiles = @"./TOHE-DATA/Tags/MOD_TAGS";
-    private static string sponsorTagsFiles = @"./TOHE-DATA/Tags/SPONSOR_TAGS";
-    private static string vipTagsFiles = @"./TOHE-DATA/Tags/VIP_TAGS";
+    private static readonly string modLogFiles = @"./TOHE-DATA/ModLogs.txt";
+    private static readonly string modTagsFiles = @"./TOHE-DATA/Tags/MOD_TAGS";
+    private static readonly string sponsorTagsFiles = @"./TOHE-DATA/Tags/SPONSOR_TAGS";
+    private static readonly string vipTagsFiles = @"./TOHE-DATA/Tags/VIP_TAGS";
 
 
-    public static List<string> ChatHistory = new();
+    public static List<string> ChatHistory = [];
 
     public static bool Prefix(ChatController __instance)
     {
@@ -57,7 +55,7 @@ internal class ChatCommands
         if (GuessManager.GuesserMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
         if (Judge.TrialMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
         if (President.EndMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
-        if (ParityCop.ParityCheckMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
+        if (Inspector.InspectCheckMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
         if (Pirate.DuelCheckMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
         if (Councillor.MurderMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
         if (Mediumshiper.MsMsg(PlayerControl.LocalPlayer, text)) goto Canceled;
@@ -77,7 +75,6 @@ internal class ChatCommands
         switch (args[0])
         {
             case "/dump":
-                canceled = true;
                 Utils.DumpLog();
                 break;
             case "/v":
@@ -180,9 +177,12 @@ internal class ChatCommands
                 case "/renomear":
                     canceled = true;
                     if (args.Length < 1) break;
-                    if (args[1].Length is > 10 or < 1)
+                    if (args.Skip(1).Join(delimiter: " ").Length is > 10 or < 1) { 
                         Utils.SendMessage(GetString("Message.AllowNameLength"), PlayerControl.LocalPlayer.PlayerId);
-                    else Main.nickName = args[1];
+                        break;
+                    }
+                    else Main.nickName = args.Skip(1).Join(delimiter: " ");
+                    Utils.SendMessage(string.Format(GetString("Message.SetName"), args.Skip(1).Join(delimiter: " ")), PlayerControl.LocalPlayer.PlayerId);
                     break;
 
                 case "/hn":
@@ -380,7 +380,10 @@ internal class ChatCommands
                     {
                         Logger.Info("GetRealKiller()", "/death command");
                         var killer = PlayerControl.LocalPlayer.GetRealKiller();
-                        Utils.SendMessage(text: GetString("DeathCmd.YourName") + "<b>" + PlayerControl.LocalPlayer.GetRealName() + "</b>" + "\n\r" + GetString("DeathCmd.YourRole") + "<b>" + $"<color={Utils.GetRoleColorCode(PlayerControl.LocalPlayer.GetCustomRole())}>{Utils.GetRoleName(PlayerControl.LocalPlayer.GetCustomRole())}</color>" + "</b>" + "\n\r" + GetString("DeathCmd.DeathReason") + "<b>" + Utils.GetVitalText(PlayerControl.LocalPlayer.PlayerId) + "</b>" + "\n\r" + "</b>" + "\n\r" + GetString("DeathCmd.KillerName") + "<b>" + killer.GetRealName() + "</b>" + "\n\r" + GetString("DeathCmd.KillerRole") + "<b>" + $"<color={Utils.GetRoleColorCode(killer.GetCustomRole())}>{Utils.GetRoleName(killer.GetCustomRole())}</color>" + "</b>", sendTo: PlayerControl.LocalPlayer.PlayerId);
+                        string killerName = killer == null ? "N/A" : killer.GetRealName();
+                        string killerRole = killer == null ? "N/A" : Utils.GetRoleName(killer.GetCustomRole());
+                        Utils.SendMessage(text: GetString("DeathCmd.YourName") + "<b>" + PlayerControl.LocalPlayer.GetRealName() + "</b>" + "\n\r" + GetString("DeathCmd.YourRole") + "<b>" + $"<color={Utils.GetRoleColorCode(PlayerControl.LocalPlayer.GetCustomRole())}>{Utils.GetRoleName(PlayerControl.LocalPlayer.GetCustomRole())}</color>" + "</b>" + "\n\r" + GetString("DeathCmd.DeathReason") + "<b>" + Utils.GetVitalText(PlayerControl.LocalPlayer.PlayerId) + "</b>" + "\n\r" + "</b>" + "\n\r" + GetString("DeathCmd.KillerName") + "<b>" + killerName + "</b>" + "\n\r" + GetString("DeathCmd.KillerRole") + "<b>" + $"<color={Utils.GetRoleColorCode(killer.GetCustomRole())}>{killerRole}</color>" + "</b>", sendTo: PlayerControl.LocalPlayer.PlayerId);
+
                         break;
                     }
 
@@ -946,10 +949,8 @@ internal class ChatCommands
                         else
                         {
                             var rand = IRandom.Instance;
-                            int botResult = Main.GuessNumber[PlayerControl.LocalPlayer.PlayerId][0];
-                            Main.GuessNumber[PlayerControl.LocalPlayer.PlayerId][0] = rand.Next(playerChoice1, playerChoice2);
-                            botResult = Main.GuessNumber[PlayerControl.LocalPlayer.PlayerId][0];
-                            Utils.SendMessage(string.Format(GetString("RandResult"), Main.GuessNumber[PlayerControl.LocalPlayer.PlayerId][0]), PlayerControl.LocalPlayer.PlayerId);
+                            int botResult = rand.Next(playerChoice1, playerChoice2 + 1);
+                            Utils.SendMessage(string.Format(GetString("RandResult"), botResult), PlayerControl.LocalPlayer.PlayerId);
                             break;
                         }
 
@@ -977,10 +978,6 @@ internal class ChatCommands
         text = text.Replace("着", "者").Trim().ToLower();
         return text switch
         {
-            // Part of the string thanks to WuQing for helping
-            // 部分string感谢WuQing帮忙
-            // 第一个为繁体中文，第二个为简体中文
-
             // Note for translators
             // This file should contain not only Simplified and Traditional Chinese strings
             // If the role has other nicknames or common misspellings in your language
@@ -996,7 +993,6 @@ internal class ChatCommands
             // eg : "A" or "B" => GetString("RealRoleName"),
             // eg : "Vector" or "Mario" => GetString("Mario"),
             // If you need to remove the roles, please delete them directly instead of commenting them out
-            // 如果需要删除职业，请直接删掉，而不是注释掉
 
             // GM
             "GM(遊戲大師)" or "管理员" or "管理" or "gm" or "GM" => GetString("GM"),
@@ -1016,18 +1012,18 @@ internal class ChatCommands
 
             // 内鬼阵营职业
             "賞金獵人" or "赏金猎人" or "赏金" => GetString("BountyHunter"),
-            "煙火工匠" or "烟花商人" or "烟花爆破者" or "烟花" => GetString("FireWorks"),
-            "嗜血殺手" or "嗜血杀手" or "嗜血" => GetString("SerialKiller"),
+            "煙火工匠" or "烟花商人" or "烟花爆破者" or "烟花" => GetString("Fireworker"),
+            "嗜血殺手" or "嗜血杀手" or "嗜血" => GetString("Mercenary"),
             "百变怪" or "千面鬼" or "千面" => GetString("ShapeMaster"),
             "吸血鬼" or "吸血" => GetString("Vampire"),
             "吸血鬼之王" or "吸血鬼女王"  => GetString("Vampiress"),
             "術士" or "术士" => GetString("Warlock"),
             "刺客" or "忍者" => GetString("Assassin"),
             "僵屍" or "僵尸" or"殭屍" or "丧尸" => GetString("Zombie"),
-            "駭客" or "骇客" or "黑客" => GetString("Hacker"),
+            "駭客" or "骇客" or "黑客" => GetString("Anonymous"),
             "礦工" or "矿工" => GetString("Miner"),
-            "殺人機器" or "杀戮机器" or "杀戮" or "机器" or "杀戮兵器" => GetString("Minimalism"),
-            "通緝犯" or "逃逸者" or "逃逸" => GetString("Escapee"),
+            "殺人機器" or "杀戮机器" or "杀戮" or "机器" or "杀戮兵器" => GetString("KillingMachine"),
+            "通緝犯" or "逃逸者" or "逃逸" => GetString("Escapist"),
             "女巫" => GetString("Witch"),
             "黑手黨" or "黑手党" or "黑手" => GetString("Mafia"),
             "傀儡師" or "傀儡师" or "傀儡" => GetString("Puppeteer"),
@@ -1035,10 +1031,11 @@ internal class ChatCommands
             "時間竊賊" or "蚀时者" or "蚀时" or "偷时" => GetString("TimeThief"),
             "狙擊手" or "狙击手" or "狙击" => GetString("Sniper"),
             "送葬者" or "暗杀者" => GetString("Undertaker"),
+            "裂縫製造者" or "裂缝制造者" => GetString("RiftMaker"),
             "邪惡的追踪者" or "邪恶追踪者" or "邪恶的追踪者" => GetString("EvilTracker"),
             "邪惡賭怪" or "邪恶赌怪" or "坏赌" or "恶赌" or "邪恶赌怪" => GetString("EvilGuesser"),
             "監管者" or "监管者" or "监管" => GetString("AntiAdminer"),
-            "狂妄殺手" or "狂妄杀手" => GetString("Sans"),
+            "狂妄殺手" or "狂妄杀手" => GetString("Arrogance"),
             "自爆兵" or "自爆" => GetString("Bomber"),
             "清道夫" or "清道" => GetString("Scavenger"),
             "陷阱師" or "诡雷" => GetString("BoobyTrap"),
@@ -1085,7 +1082,6 @@ internal class ChatCommands
             "教唆者" or "教唆" => GetString("Instigator"),
 
             // 船员阵营职业
-            //"幸運兒" or "幸运儿" or "幸运" => GetString("Luckey"),
             "擺爛人" or "摆烂人" or "摆烂" => GetString("Needy"),
             "大明星" or "明星" => GetString("SuperStar"),
             "網紅" or "网红" => GetString("CyberStar"),
@@ -1139,7 +1135,7 @@ internal class ChatCommands
             "先知" or "神谕" or "神谕者" => GetString("Oracle"),
             "靈魂論者" or "灵魂论者" => GetString("Spiritualist"),
             "變色龍" or "变色龙" or "变色" => GetString("Chameleon"),
-            "檢查員" or "检查员" or "检查" => GetString("ParityCop"),
+            "檢查員" or "检查员" or "检查" => GetString("Inspector"),
             "仰慕者" or "仰慕" => GetString("Admirer"),
             "時間之主" or "时间之主" or "回溯时间" => GetString("TimeMaster"),
             "十字軍" or "十字军" => GetString("Crusader"),
@@ -1157,6 +1153,7 @@ internal class ChatCommands
             "猜想者" or "猜想" or "谜团" => GetString("Enigma"),
             "船長" or "舰长" or "船长" => GetString("Captain"),
             "慈善家" or "恩人" => GetString("Benefactor"),
+            "測驗者" or "测验长" => GetString("Quizmaster"),
 
             // 中立阵营职业
             "小丑" or "丑皇" => GetString("Jester"),
@@ -1172,9 +1169,12 @@ internal class ChatCommands
             "豺狼" or "蓝狼" => GetString("Jackal"),
             "神" or "上帝" => GetString("God"),
             "冤罪師" or "冤罪师" or "冤罪" => GetString("Innocent"),
+            "暗殺者" or "隐形者" =>GetString("Stealth"),
+            "企鵝" or "企鹅" =>GetString("Penguin"),
             "鵜鶘" or "鹈鹕" => GetString("Pelican"),
+            "疫醫" or "瘟疫学家" => GetString("PlagueDoctor"),
             "革命家" or "革命者" => GetString("Revolutionist"),
-            "單身狗" or "FFF团" or "fff" or "FFF" or "fff团" => GetString("FFF"),
+            "單身狗" => GetString("Hater"),
             "柯南" => GetString("Konan"),
             "玩家" => GetString("Gamer"),
             "潛藏者" or "潜藏" => GetString("DarkHide"),
@@ -1190,7 +1190,7 @@ internal class ChatCommands
             "巫婆" => GetString("NWitch"),
             "追隨者" or "赌徒" or "下注" => GetString("Totocalcio"),
             "魅魔" => GetString("Succubus"),
-            "連環殺手" or "连环杀手" => GetString("NSerialKiller"),
+            "連環殺手" or "连环杀手" => GetString("SerialKiller"),
             "劍聖" or "天启" => GetString("Juggernaut"),
             "感染者" or "感染" => GetString("Infectious"),
             "病原體" or "病毒" => GetString("Virus"),
@@ -1199,7 +1199,7 @@ internal class ChatCommands
             "挑戰者" or "决斗者" or "挑战者" => GetString("Pirate"),
             "炸彈王" or "炸弹狂" or "煽动者" => GetString("Agitater"),
             "獨行者" or "独行者" => GetString("Maverick"),
-            "被詛咒的靈魂" or "被诅咒的灵魂" => GetString("CursedSoul"),
+            "被詛咒的靈魂" or "诅咒之人" => GetString("CursedSoul"),
             "竊賊" or "小偷" => GetString("Pickpocket"),
             "背叛者" or "背叛" => GetString("Traitor"),
             "禿鷲" or "秃鹫" => GetString("Vulture"),
@@ -1220,6 +1220,7 @@ internal class ChatCommands
             "精靈" or "小精灵" or "精灵" => GetString("Pixie"),
             "咒魔" or "神秘者" => GetString("Occultist"),
             "靈魂收割者" or "灵魂收集者" or "灵魂收集" or "收集灵魂" => GetString("SoulCollector"),
+            "薛丁格的貓" or "薛定谔的猫" => GetString("SchrodingersCat"),
             "暗戀者" or "浪漫者" => GetString("Romantic"),
             "報復者" or "复仇浪漫者" => GetString("VengefulRomantic"),
             "絕情者" or "无情浪漫者" => GetString("RuthlessRomantic"),
@@ -1262,6 +1263,7 @@ internal class ChatCommands
             "被感染" or "感染" => GetString("Infected"),
             "防賭" or "不可被赌" => GetString("Onbound"),
             "反擊者" or "回弹者" or "回弹" => GetString("Rebound"),
+            "平凡者" or "平凡" => GetString("Mundane"),
             "騎士" or "骑士" => GetString("Knighted"),
             "漠視" or "不受重视" or "被漠視的" => GetString("Unreportable"),
             "被傳染" or "传染性" => GetString("Contagious"),
@@ -1295,13 +1297,13 @@ internal class ChatCommands
             "敏捷" => GetString("Nimble"),
             "規避者" or "规避者" or "规避" => GetString("Circumvent"),
             "名人" or "网络员" or "网络" => GetString("Cyber"),
-            "維修員" or "维修员" or "維修員" or "维修" => GetString("Repairman"),
             "焦急者" or "焦急的" or "焦急" => GetString("Hurried"),
             "OIIAI" => GetString("Oiiai"),
             "順從者" or "影响者" or "順從" or "影响" => GetString("Influenced"),
             "沉默者" or "沉默" => GetString("Silent"),
-            "" or "" => GetString("Susceptible"),
-            "平凡者" or "平凡" => GetString("Mundane"),
+            "易感者" or "易感" => GetString("Susceptible"),
+            "彩虹" => GetString("Rainbow"),
+            "疲勞者" or "疲劳者" or "疲勞" or "疲劳" => GetString("Tired"),
 
             // 随机阵营职业
             "迷你船員" or "迷你船员" or "迷你" or "小孩" => GetString("Mini"),
@@ -1349,10 +1351,10 @@ internal class ChatCommands
             return;
         }
         role = role.Trim().ToLower();
-        if (role.StartsWith("/r")) role.Replace("/r", string.Empty);
-        if (role.StartsWith("/up")) role.Replace("/up", string.Empty);
-        if (role.EndsWith("\r\n")) role.Replace("\r\n", string.Empty);
-        if (role.EndsWith("\n")) role.Replace("\n", string.Empty);
+        if (role.StartsWith("/r")) _ = role.Replace("/r", string.Empty);
+        if (role.StartsWith("/up")) _ = role.Replace("/up", string.Empty);
+        if (role.EndsWith("\r\n")) _ = role.Replace("\r\n", string.Empty);
+        if (role.EndsWith("\n")) _ = role.Replace("\n", string.Empty);
 
         if (role == "" || role == string.Empty)
         {
@@ -1413,27 +1415,38 @@ internal class ChatCommands
             ChatManager.SendMessage(player, text);
         }
 
+        Logger.Info($"player.PlayerId {player.PlayerId} send message: ''{text}''", "OnReceiveChat");
+
         if (text.StartsWith("\n")) text = text[1..];
         //if (!text.StartsWith("/")) return;
         string[] args = text.Split(' ');
         string subArgs = "";
         string subArgs2 = "";
+
+        if (text.Length <= 11) // Check command if Length < or = 11
+        {
+            Logger.Info($"Message now: ''{text}''", "OnReceiveChat");
+            Logger.Info($"Args: ''{args}''", "OnReceiveChat");
+        }
+
         //if (text.Length >= 3) if (text[..2] == "/r" && text[..3] != "/rn") args[0] = "/r";
         //   if (SpamManager.CheckSpam(player, text)) return;
-        if (GuessManager.GuesserMsg(player, text)) { canceled = true; return; }
-        if (Judge.TrialMsg(player, text)) { canceled = true; return; }
-        if (President.EndMsg(player, text)) { canceled = true; return; }
-        if (ParityCop.ParityCheckMsg(player, text)) { canceled = true; return; }
-        if (Pirate.DuelCheckMsg(player, text)) { canceled = true; return; }
-        if (Councillor.MurderMsg(player, text)) { canceled = true; return; }
-        if (Swapper.SwapMsg(player, text)) { canceled = true; return; }
-        if (Mediumshiper.MsMsg(player, text)) return;
-        if (MafiaRevengeManager.MafiaMsgCheck(player, text)) return;
-        if (RetributionistRevengeManager.RetributionistMsgCheck(player, text)) return;
+        if (GuessManager.GuesserMsg(player, text)) { canceled = true; Logger.Info($"Is Guesser command", "OnReceiveChat"); return; }
+        if (Judge.TrialMsg(player, text)) { canceled = true; Logger.Info($"Is Judge command", "OnReceiveChat"); return; }
+        if (President.EndMsg(player, text)) { canceled = true; Logger.Info($"Is President command", "OnReceiveChat"); return; }
+        if (Inspector.InspectCheckMsg(player, text)) { canceled = true; Logger.Info($"Is Inspector command", "OnReceiveChat"); return; }
+        if (Pirate.DuelCheckMsg(player, text)) { canceled = true; Logger.Info($"Is Pirate command", "OnReceiveChat"); return; }
+        if (Councillor.MurderMsg(player, text)) { canceled = true; Logger.Info($"Is Councillor command", "OnReceiveChat"); return; }
+        if (Swapper.SwapMsg(player, text)) { canceled = true; Logger.Info($"Is Swapper command", "OnReceiveChat"); return; }
+        if (Mediumshiper.MsMsg(player, text)) { Logger.Info($"Is Medium command", "OnReceiveChat"); return; }
+        if (MafiaRevengeManager.MafiaMsgCheck(player, text)) { Logger.Info($"Is Mafia Revenge command", "OnReceiveChat"); return; }
+        if (RetributionistRevengeManager.RetributionistMsgCheck(player, text)) { Logger.Info($"Is Retributionist Revenge command", "OnReceiveChat"); return; }
+
         Directory.CreateDirectory(modTagsFiles);
         Directory.CreateDirectory(vipTagsFiles);
         Directory.CreateDirectory(sponsorTagsFiles);
 
+        Logger.Info($"This player was Blackmailed?", "OnReceiveChat");
         if (Blackmailer.ForBlackmailer.Contains(player.PlayerId) && player.IsAlive() && player.PlayerId != 0)
         {
             ChatManager.SendPreviousMessagesToAll();
@@ -1441,9 +1454,59 @@ internal class ChatCommands
             canceled = true; 
             return; 
         }
-        
+
+        if (text.Length <= 11)
+        {
+            Logger.Info($"args[0] has message: ''{args[0]}''", "OnReceiveChat");
+        }
         switch (args[0])
         {
+            case "/r":
+            case "/role":
+                Logger.Info($"Command '/r' was activated", "OnReceiveChat");
+                subArgs = text.Remove(0, 2);
+                SendRolesInfo(subArgs, player.PlayerId, player.FriendCode.GetDevUser().DeBug);
+                break;
+
+            case "/m":
+            case "/myrole":
+            case "/minhafunção":
+                Logger.Info($"Command '/m' was activated", "OnReceiveChat");
+                var role = player.GetCustomRole();
+                if (GameStates.IsInGame)
+                {
+                    var sb = new StringBuilder();
+                    //sb.Append(String.Format(GetString("PlayerNameForRoleInfo"), Main.AllPlayerNames[player.PlayerId]));
+                    sb.Append(GetString(role.ToString()) + Utils.GetRoleMode(role) + player.GetRoleInfo(true));
+
+                    if (Options.CustomRoleSpawnChances.TryGetValue(role, out var opt))
+                        Utils.ShowChildrenSettings(opt, ref sb, command: true);
+
+                    var txt = sb.ToString();
+
+                    sb.Clear().Append(txt.RemoveHtmlTags());
+
+                    foreach (var subRole in Main.PlayerStates[player.PlayerId].SubRoles.ToArray())
+                    {
+                        sb.Append($"\n\n" + GetString($"{subRole}") + Utils.GetRoleMode(subRole) + GetString($"{subRole}InfoLong"));
+
+                        if (CustomRoles.Ntr.RoleExist() && (role is not CustomRoles.GM and not CustomRoles.Ntr))
+                            sb.Append($"\n\n" + GetString($"Lovers") + Utils.GetRoleMode(CustomRoles.Lovers) + GetString($"LoversInfoLong"));
+                    }
+                    Utils.SendMessage(sb.ToString(), player.PlayerId);
+
+                    Logger.Info($"Command '/m' should be send message", "OnReceiveChat");
+                }
+                else
+                    Utils.SendMessage(GetString("Message.CanNotUseInLobby"), player.PlayerId);
+                break;
+
+            case "/h":
+            case "/help":
+            case "/ajuda":
+                Utils.ShowHelpToClient(player.PlayerId);
+                break;
+
             case "/ans":
             case "/asw":
             case "/answer":
@@ -1482,6 +1545,31 @@ internal class ChatCommands
                 Utils.ShowLastRoles(player.PlayerId);
                 break;
 
+            case "/rn":
+            case "/rename":
+            case "/renomear":
+                if (Options.PlayerCanSetName.GetBool() || player.FriendCode.GetDevUser().IsDev || player.FriendCode.GetDevUser().NameCmd || Utils.IsPlayerVIP(player.FriendCode))
+                {
+                    if (GameStates.IsInGame)
+                    {
+                        Utils.SendMessage(GetString("Message.OnlyCanUseInLobby"), player.PlayerId);
+                        break;
+                    }
+                    if (args.Length < 1) break;
+                    if (args.Skip(1).Join(delimiter: " ").Length is > 10 or < 1)
+                    {
+                        Utils.SendMessage(GetString("Message.AllowNameLength"), player.PlayerId);
+                        break;
+                    }
+                    Main.AllPlayerNames[player.PlayerId] = args.Skip(1).Join(delimiter: " ");
+                    Utils.SendMessage(string.Format(GetString("Message.SetName"), args.Skip(1).Join(delimiter: " ")), player.PlayerId);
+                    break;
+                }
+                else
+                {
+                    Utils.SendMessage(GetString("DisableUseCommand"), player.PlayerId);
+                }
+                break;
 
             case "/n":
             case "/now":
@@ -1505,42 +1593,8 @@ internal class ChatCommands
                 }
                 break;
 
-            case "/r":
-                subArgs = text.Remove(0, 2);
-                SendRolesInfo(subArgs, player.PlayerId, player.FriendCode.GetDevUser().DeBug);
-                break;
-
-            case "/h":
-            case "/help":
-            case "/ajuda":
-                Utils.ShowHelpToClient(player.PlayerId);
-                break;
-
-            case "/m":
-            case "/myrole":
-            case "/minhafunção":
-                var role = player.GetCustomRole();
-                if (GameStates.IsInGame)
-                {
-                    var sb = new StringBuilder();
-                    //sb.Append(String.Format(GetString("PlayerNameForRoleInfo"), Main.AllPlayerNames[player.PlayerId]));
-                    sb.Append(GetString(role.ToString()) + Utils.GetRoleMode(role) + player.GetRoleInfo(true));
-                    if (Options.CustomRoleSpawnChances.TryGetValue(role, out var opt))
-                        Utils.ShowChildrenSettings(Options.CustomRoleSpawnChances[role], ref sb, command: true);
-                    var txt = sb.ToString();
-                    sb.Clear().Append(txt.RemoveHtmlTags());
-                    foreach (var subRole in Main.PlayerStates[player.PlayerId].SubRoles.ToArray())
-                        sb.Append($"\n\n" + GetString($"{subRole}") + Utils.GetRoleMode(subRole) + GetString($"{subRole}InfoLong"));
-                    if (CustomRolesHelper.RoleExist(CustomRoles.Ntr) && (role is not CustomRoles.GM and not CustomRoles.Ntr))
-                        sb.Append($"\n\n" + GetString($"Lovers") + Utils.GetRoleMode(CustomRoles.Lovers) + GetString($"LoversInfoLong"));
-                    Utils.SendMessage(sb.ToString(), player.PlayerId);
-                }
-                else
-                    Utils.SendMessage(GetString("Message.CanNotUseInLobby"), player.PlayerId);
-                break;
-
             case "/up":
-                subArgs = text.Remove(0, 3);
+                _ = text.Remove(0, 3);
                 if (!Options.EnableUpMode.GetBool())
                 {
                     Utils.SendMessage(string.Format(GetString("Message.YTPlanDisabled"), GetString("EnableYTPlan")), player.PlayerId);
@@ -1620,7 +1674,9 @@ internal class ChatCommands
                 else
                 {
                     var killer = player.GetRealKiller();
-                    Utils.SendMessage(GetString("DeathCmd.YourName") + "<b>" + player.GetRealName() + "</b>" + "\n\r" + GetString("DeathCmd.YourRole") + "<b>" + $"<color={Utils.GetRoleColorCode(player.GetCustomRole())}>{Utils.GetRoleName(player.GetCustomRole())}</color>" + "</b>" + "\n\r" + GetString("DeathCmd.DeathReason") + "<b>" + Utils.GetVitalText(player.PlayerId) + "</b>" + "\n\r" + "</b>" + "\n\r" + GetString("DeathCmd.KillerName") + "<b>" + killer.GetRealName() + "</b>" + "\n\r" + GetString("DeathCmd.KillerRole") + "<b>" + $"<color={Utils.GetRoleColorCode(killer.GetCustomRole())}>{Utils.GetRoleName(killer.GetCustomRole())}</color>" + "</b>", player.PlayerId);
+                    string killerName = killer == null ? "N/A" : killer.GetRealName();
+                    string killerRole = killer == null ? "N/A" : Utils.GetRoleName(killer.GetCustomRole());
+                    Utils.SendMessage(GetString("DeathCmd.YourName") + "<b>" + player.GetRealName() + "</b>" + "\n\r" + GetString("DeathCmd.YourRole") + "<b>" + $"<color={Utils.GetRoleColorCode(player.GetCustomRole())}>{Utils.GetRoleName(player.GetCustomRole())}</color>" + "</b>" + "\n\r" + GetString("DeathCmd.DeathReason") + "<b>" + Utils.GetVitalText(player.PlayerId) + "</b>" + "\n\r" + "</b>" + "\n\r" + GetString("DeathCmd.KillerName") + "<b>" + killerName + "</b>" + "\n\r" + GetString("DeathCmd.KillerRole") + "<b>" + $"<color={Utils.GetRoleColorCode(killer.GetCustomRole())}>{killerRole}</color>" + "</b>", player.PlayerId);
                     break;
                 }
 
@@ -1729,7 +1785,7 @@ internal class ChatCommands
                     Utils.SendMessage(GetString("BanCommandNoAccess"), player.PlayerId);
                     break;
                 }
-                string banReason = "";
+                string banReason;
                 if (args.Length < 3)
                 {
                     Utils.SendMessage(GetString("BanCommandNoReason"), player.PlayerId);
@@ -1962,7 +2018,7 @@ internal class ChatCommands
                 else
                 {
                     subArgs = args.Length < 3 ? "" : args[1] + " " + args[2];
-                    Regex regex = new Regex(@"^[0-9A-Fa-f]{6}\s[0-9A-Fa-f]{6}$");
+                    Regex regex = new(@"^[0-9A-Fa-f]{6}\s[0-9A-Fa-f]{6}$");
                     if (string.IsNullOrEmpty(subArgs) || !regex.IsMatch(subArgs))
                     {
                         Logger.Msg($"{subArgs}", "modcolor");
@@ -2019,7 +2075,7 @@ internal class ChatCommands
                 else
                 {
                     subArgs = args.Length < 3 ? "" : args[1] + " " + args[2];
-                    Regex regexx = new Regex(@"^[0-9A-Fa-f]{6}\s[0-9A-Fa-f]{6}$");
+                    Regex regexx = new(@"^[0-9A-Fa-f]{6}\s[0-9A-Fa-f]{6}$");
                     if (string.IsNullOrEmpty(subArgs) || !regexx.IsMatch(subArgs))
                     {
                         Logger.Msg($"{subArgs}", "vipcolor");
@@ -2255,10 +2311,8 @@ internal class ChatCommands
                 else
                 {
                     var rand = IRandom.Instance;
-                    int botResult = Main.GuessNumber[player.PlayerId][0];
-                    Main.GuessNumber[player.PlayerId][0] = rand.Next(playerChoice1, playerChoice2);
-                    botResult = Main.GuessNumber[player.PlayerId][0];
-                    Utils.SendMessage(string.Format(GetString("RandResult"), Main.GuessNumber[player.PlayerId][0]), player.PlayerId);
+                    int botResult = rand.Next(playerChoice1, playerChoice2 + 1);
+                    Utils.SendMessage(string.Format(GetString("RandResult"), botResult), player.PlayerId);
                     break;
                 }
 
@@ -2350,6 +2404,11 @@ class RpcSendChatPatch
         {
             __result = false;
             return false;
+        }
+        if (!GameStates.IsModHost)
+        {
+            __result = false;
+            return true;
         }
         int return_count = PlayerControl.LocalPlayer.name.Count(x => x == '\n');
         chatText = new StringBuilder(chatText).Insert(0, "\n", return_count).ToString();

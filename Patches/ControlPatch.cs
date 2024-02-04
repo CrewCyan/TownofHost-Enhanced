@@ -14,13 +14,13 @@ namespace TOHE;
 [HarmonyPatch(typeof(ControllerManager), nameof(ControllerManager.Update))]
 internal class ControllerManagerUpdatePatch
 {
-    private static readonly (int, int)[] resolutions = { (480, 270), (640, 360), (800, 450), (1280, 720), (1600, 900), (1920, 1080) };
+    private static readonly (int, int)[] resolutions = [(480, 270), (640, 360), (800, 450), (1280, 720), (1600, 900), (1920, 1080)];
     private static int resolutionIndex = 0;
 
-    public static List<string> addDes = new();
+    public static List<string> addDes = [];
     public static int addonIndex = -1;
 
-    public static void Postfix(ControllerManager __instance)
+    public static void Postfix(/*ControllerManager __instance*/)
     {
         try
         {
@@ -81,7 +81,7 @@ internal class ControllerManagerUpdatePatch
                     var lp = PlayerControl.LocalPlayer;
                     if (Main.PlayerStates[lp.PlayerId].SubRoles.Count == 0) return;
 
-                    addDes = new();
+                    addDes = [];
                     foreach (var subRole in Main.PlayerStates[lp.PlayerId].SubRoles.Where(x => x is not CustomRoles.Charmed).ToArray())
                     {
                         addDes.Add(GetString($"{subRole}") + Utils.GetRoleMode(subRole) + GetString($"{subRole}InfoLong"));
@@ -167,13 +167,22 @@ internal class ControllerManagerUpdatePatch
                     GameEndCheckerForNormal.StartEndGame(GameOverReason.ImpostorDisconnect);
                 }
             }
-            //强制结束会议或召开会议
+            // Forse start/end Meeting
             if (GetKeysDown(KeyCode.Return, KeyCode.M, KeyCode.LeftShift) && GameStates.IsInGame)
             {
                 if (GameStates.IsHideNSeek) return;
 
                 if (GameStates.IsMeeting)
                 {
+                    foreach (var pva in MeetingHud.Instance.playerStates)
+                    {
+                        if (pva == null) continue;
+
+                        if (pva.VotedFor < 253)
+                            MeetingHud.Instance.RpcClearVote(pva.TargetPlayerId);
+                    }
+                    List<MeetingHud.VoterState> statesList = [];
+                    MeetingHud.Instance.RpcVotingComplete(statesList.ToArray(), null, true);
                     MeetingHud.Instance.RpcClose();
                 }
                 else
@@ -217,8 +226,9 @@ internal class ControllerManagerUpdatePatch
                 Main.isChatCommand = true;
                 Utils.ShowActiveSettings();
             }
+
             // Reset All TOHE Setting To Default
-            if (GameStates.IsLobby && GetKeysDown(KeyCode.Delete, KeyCode.LeftControl))
+            if (GameStates.IsLobby && GetKeysDown(KeyCode.LeftControl, KeyCode.LeftShift, KeyCode.Return, KeyCode.Delete))
             {
                 OptionItem.AllOptions.ToArray().Where(x => x.Id > 0).Do(x => x.SetValueNoRpc(x.DefaultValue));
                 Logger.SendInGame(GetString("RestTOHESetting"));
@@ -229,6 +239,7 @@ internal class ControllerManagerUpdatePatch
                 }
                 OptionShower.GetText();
             }
+
             //放逐自己
             if (GetKeysDown(KeyCode.Return, KeyCode.E, KeyCode.LeftShift) && GameStates.IsInGame)
             {

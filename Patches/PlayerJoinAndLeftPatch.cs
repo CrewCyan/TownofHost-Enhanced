@@ -2,6 +2,7 @@ using AmongUs.Data;
 using AmongUs.GameOptions;
 using HarmonyLib;
 using Hazel;
+using Il2CppSystem.Threading.Tasks;
 using InnerNet;
 using System;
 using System.Collections.Generic;
@@ -24,8 +25,7 @@ class OnGameJoinedPatch
         Logger.Info($"{__instance.GameId} Joining room", "OnGameJoined");
 
         Main.IsHostVersionCheating = false;
-        Main.playerVersion = new();
-        if (!Main.VersionCheat.Value) RPC.RpcVersionCheck();
+        Main.playerVersion = [];
         SoundManager.Instance.ChangeAmbienceVolume(DataManager.Settings.Audio.AmbienceVolume);
 
         Main.HostClientId = AmongUsClient.Instance.HostId;
@@ -36,7 +36,7 @@ class OnGameJoinedPatch
         GameStates.InGame = false;
         ErrorText.Instance.Clear();
 
-        if (HorseModePatch.GetRealConstant() != Constants.GetBroadcastVersion() - 25 && GameStates.IsOnlineGame)
+        if (HorseModePatch.GetRealConstant() != Constants.GetBroadcastVersion() - 25 && GameStates.IsOnlineGame && !DevManager.IsDevUser(EOSManager.Instance.FriendCode))
         {
             AmongUsClient.Instance.ExitGame(DisconnectReasons.Hacking);
             SceneChanger.ChangeScene("MainMenu");
@@ -55,11 +55,11 @@ class OnGameJoinedPatch
             GameStartManagerPatch.GameStartManagerUpdatePatch.exitTimer = -1;
             Main.DoBlockNameChange = false;
             Main.newLobby = true;
-            Main.DevRole = new();
+            Main.DevRole = [];
             EAC.DeNum = new();
-            Main.AllPlayerNames = new();
-            Main.PlayerQuitTimes = new();
-            KickPlayerPatch.AttemptedKickPlayerList = new();
+            Main.AllPlayerNames = [];
+            Main.PlayerQuitTimes = [];
+            KickPlayerPatch.AttemptedKickPlayerList = [];
 
             switch (GameOptionsManager.Instance.CurrentGameOptions.GameMode)
             {
@@ -107,17 +107,38 @@ class OnGameJoinedPatch
 
         _ = new LateTask(() =>
         {
-            if (!GameStates.IsOnlineGame) return;
-            if (!GameStates.IsModHost)
-                RPC.RpcRequestRetryVersionCheck();
-            if (BanManager.CheckEACList(PlayerControl.LocalPlayer.FriendCode, PlayerControl.LocalPlayer.GetClient().GetHashedPuid()) && GameStates.IsOnlineGame)
+            try
             {
-                AmongUsClient.Instance.ExitGame(DisconnectReasons.Banned);
-                SceneChanger.ChangeScene("MainMenu");
-                return;
+                if (!GameStates.IsOnlineGame) return;
+                if (!GameStates.IsModHost)
+                    RPC.RpcRequestRetryVersionCheck();
+                if (BanManager.CheckEACList(PlayerControl.LocalPlayer.FriendCode, PlayerControl.LocalPlayer.GetClient().GetHashedPuid()) && GameStates.IsOnlineGame)
+                {
+                    AmongUsClient.Instance.ExitGame(DisconnectReasons.Banned);
+                    SceneChanger.ChangeScene("MainMenu");
+                    return;
+                }
+                var client = AmongUsClient.Instance.GetClientFromCharacter(PlayerControl.LocalPlayer);
+                var host = AmongUsClient.Instance.GetHost();
+                Logger.Info($"{client.PlayerName.RemoveHtmlTags()}(ClientID:{client.Id}/FriendCode:{client.FriendCode}/HashPuid:{client.GetHashedPuid()}/Platform:{client.PlatformData.Platform}) finished join room", "Session: OnGameJoined");
+                Logger.Info($"{host.PlayerName.RemoveHtmlTags()}(ClientID:{host.Id}/FriendCode:{host.FriendCode}/HashPuid:{host.GetHashedPuid()}/Platform:{host.PlatformData.Platform}) is the host", "Session: OnGameJoined");
             }
-            var client = PlayerControl.LocalPlayer.GetClient();
-            Logger.Info($"{client.PlayerName.RemoveHtmlTags()}(ClientID:{client.Id}/FriendCode:{client.FriendCode}/HashPuid:{client.GetHashedPuid()}/Platform:{client.PlatformData.Platform}) finished join room", "Session: OnGameJoined");
+            catch
+            {
+                Logger.Error("Error while trying to log local client data.", "OnGameJoinedPatch");
+                _ = new LateTask(() =>
+                {
+                    try
+                    {
+                        if (!GameStates.IsOnlineGame && !GameStates.IsLocalGame) return;
+                        var client = AmongUsClient.Instance.GetClientFromCharacter(PlayerControl.LocalPlayer);
+                        var host = AmongUsClient.Instance.GetHost();
+                        Logger.Info($"{client.PlayerName.RemoveHtmlTags()}(ClientID:{client.Id}/FriendCode:{client.FriendCode}/HashPuid:{client.GetHashedPuid()}/Platform:{client.PlatformData.Platform}) finished join room", "Session: OnGameJoined Retry");
+                        Logger.Info($"{host.PlayerName.RemoveHtmlTags()}(ClientID:{host.Id}/FriendCode:{host.FriendCode}/HashPuid:{host.GetHashedPuid()}/Platform:{host.PlatformData.Platform}) is the host", "Session: OnGameJoined Retry");
+                    }
+                    catch { };
+                }, 1.5f, "Retry Log Local Client");
+            }
         }, 0.6f, "OnGameJoinedPatch");
     }
 }
@@ -136,7 +157,20 @@ class OnPlayerJoinedPatch
     public static void Postfix(/*AmongUsClient __instance,*/ [HarmonyArgument(0)] ClientData client)
     {
         Logger.Info($"{client.PlayerName}(ClientID:{client.Id}/FriendCode:{client.FriendCode}/HashPuid:{client.GetHashedPuid()}/Platform:{client.PlatformData.Platform}) Joining room", "Session: OnPlayerJoined");
-        RPC.RpcVersionCheck();
+        _ = new LateTask(() =>
+        {
+            try
+            {
+                if (client.Character != null)
+                {
+                    RPC.RpcVersionCheck();
+                    Logger.Info("On player joined version check, target player id " + client.Character.PlayerId, "OnPlayerJoinedPatch");
+                }
+                else Logger.Error("New coming client character is null!" + client.Id, "OnPlayerJoinedPatch");
+            }
+            catch { }
+        }, 2.5f, "OnPlayerJoined Client<=>Client VersionCheck", false);
+
 
         if (AmongUsClient.Instance.AmHost && client.FriendCode == "" && Options.KickPlayerFriendCodeNotExist.GetBool() && !GameStates.IsLocalGame)
         {
@@ -154,6 +188,13 @@ class OnPlayerJoinedPatch
                 Logger.SendInGame(string.Format(GetString("Message.TempBannedByNoFriendCode"), client.PlayerName));
                 Logger.Info($"TempBanned a player {client?.PlayerName} without a friend code", "Temp Ban");
             }
+        }
+
+        if (Options.AllowOnlyWhiteList.GetBool() && !BanManager.CheckAllowList(client?.FriendCode) && !GameStates.IsLocalGame)
+        {
+            AmongUsClient.Instance.KickPlayer(client.Id, false);
+            Logger.SendInGame(string.Format(GetString("Message.KickedByWhiteList"), client.PlayerName));
+            Logger.Warn($"Kicked player {client?.PlayerName}, because friendcode: {client?.FriendCode} is not in WhiteList.txt", "Kick");
         }
 
         Platforms platform = client.PlatformData.Platform;
@@ -262,9 +303,14 @@ class OnPlayerLeftPatch
                     Utils.DoNotifyRoles(SpecifyTarget: data.Character, ForceLoop: true);
                 }
 
+                data.Character.RpcSetName(data.Character.GetRealName(isMeeting: true));
+
                 AntiBlackout.OnDisconnect(data.Character.Data);
                 PlayerGameOptionsSender.RemoveSender(data.Character);
             }
+
+            if (Main.HostClientId != data.Id && Main.playerVersion.ContainsKey(data.Id))
+                Main.playerVersion.Remove(data.Id);
 
             if (Main.HostClientId == data.Id && Main.playerVersion.ContainsKey(data.Id))
             {
@@ -370,6 +416,7 @@ class OnPlayerLeftPatch
 
                 if (GameStates.IsMeeting)
                 {
+                    Swapper.CheckSwapperTarget(data.Character.PlayerId);
                     MeetingHud.Instance.CheckForEndVoting();
                 }
             }
@@ -384,7 +431,7 @@ class OnPlayerLeftPatch
 [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.CreatePlayer))]
 class CreatePlayerPatch
 {
-    public static void Postfix(AmongUsClient __instance, [HarmonyArgument(0)] ClientData client)
+    public static void Postfix(/*AmongUsClient __instance,*/ [HarmonyArgument(0)] ClientData client)
     {
         if (!AmongUsClient.Instance.AmHost) return;
 
@@ -416,7 +463,7 @@ class CreatePlayerPatch
         }
 
         _ = new LateTask(() => { if (client.Character == null || client == null) return; OptionItem.SyncAllOptions(client.Id); }, 3f, "Sync All Options For New Player");
-        Main.GuessNumber[client.Character.PlayerId] = new List<int> { -1, 7 };
+        Main.GuessNumber[client.Character.PlayerId] = [-1, 7];
 
         _ = new LateTask(() =>
         {

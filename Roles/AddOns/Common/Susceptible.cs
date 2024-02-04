@@ -26,8 +26,8 @@ public class Susceptible
 
     public static void ChangeRandomDeath()
     {
-        PlayerState.DeathReason[] deathReasons = (PlayerState.DeathReason[])Enum.GetValues(typeof(PlayerState.DeathReason));
-        Random random = new Random();
+        PlayerState.DeathReason[] deathReasons = EnumHelper.GetAllValues<PlayerState.DeathReason>();
+        Random random = new();
         int randomIndex = random.Next(deathReasons.Length);
         randomReason = deathReasons[randomIndex];
     }
@@ -37,7 +37,7 @@ public class Susceptible
         ChangeRandomDeath();
         if (EnabledDeathReasons.GetBool())
         {
-            Logger.Info($"{victim.GetNameWithRole()} had the deathreason {randomReason}", "Susceptible");
+            Logger.Info($"{victim.GetNameWithRole().RemoveHtmlTags()} had the death reason {randomReason}", "Susceptible");
             switch (randomReason)
             {
                 case PlayerState.DeathReason.Eaten:
@@ -131,7 +131,7 @@ public class Susceptible
                     break;
 
                 case PlayerState.DeathReason.Bombed:
-                    if (!CustomRoles.Bomber.RoleExist() && !CustomRoles.Burst.RoleExist() && !CustomRoles.BoobyTrap.RoleExist() && !FireWorks.IsEnable)
+                    if (!CustomRoles.Bomber.RoleExist() && !CustomRoles.Burst.RoleExist() && !CustomRoles.BoobyTrap.RoleExist() && !Fireworker.IsEnable)
                     {
                         Main.PlayerStates[victim.PlayerId].deathReason = PlayerState.DeathReason.Kill;
                     }

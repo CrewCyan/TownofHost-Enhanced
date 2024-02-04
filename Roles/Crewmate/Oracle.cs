@@ -9,7 +9,7 @@ namespace TOHE.Roles.Crewmate;
 public static class Oracle
 {
     private static readonly int Id = 9100;
-    private static List<byte> playerIdList = new();
+    private static List<byte> playerIdList = [];
     public static bool IsEnable = false;
 
     public static OptionItem CheckLimitOpt;
@@ -18,9 +18,9 @@ public static class Oracle
     public static OptionItem FailChance;
     public static OptionItem OracleAbilityUseGainWithEachTaskCompleted;
     public static OptionItem ChangeRecruitTeam;
-    public static List<byte> didVote = new();
-    public static Dictionary<byte, float> CheckLimit = new();
-    public static Dictionary<byte, float> TempCheckLimit = new();
+    public static List<byte> didVote = [];
+    public static Dictionary<byte, float> CheckLimit = [];
+    public static Dictionary<byte, float> TempCheckLimit = [];
 
     public static void SetupCustomOption()
     {
@@ -41,9 +41,9 @@ public static class Oracle
     }
     public static void Init()
     {
-        playerIdList = new();
-        CheckLimit = new();
-        TempCheckLimit = new();
+        playerIdList = [];
+        CheckLimit = [];
+        TempCheckLimit = [];
         IsEnable = false;
     }
     public static void Add(byte playerId)
@@ -51,6 +51,11 @@ public static class Oracle
         playerIdList.Add(playerId);
         CheckLimit.TryAdd(playerId, CheckLimitOpt.GetInt());
         IsEnable = true;
+    }
+    public static void Remove(byte playerId)
+    {
+        playerIdList.Remove(playerId);
+        CheckLimit.Remove(playerId);
     }
     public static void SendRPC(byte playerId, bool isTemp = false)
     {
@@ -132,10 +137,10 @@ public static class Oracle
                 //      CustomRoles.Zombie or
                 //      CustomRoles.Warlock or
                 //      CustomRoles.Assassin or
-                //      CustomRoles.Hacker or
+                //      CustomRoles.Anonymous or
                 //      CustomRoles.Miner or
-                //      CustomRoles.Escapee or
-                //      CustomRoles.SerialKiller or
+                //      CustomRoles.Escapist or
+                //      CustomRoles.Mercenary or
                 // //     CustomRoles.Mare or
                 //      CustomRoles.Inhibitor or
                 //      CustomRoles.Councillor or
@@ -144,15 +149,15 @@ public static class Oracle
                 //      CustomRoles.TimeThief or
                 ////      CustomRoles.Trickster or // Trickster appears as crew to Oracle
                 //      CustomRoles.Mafia or
-                //      CustomRoles.Minimalism or
-                //      CustomRoles.FireWorks or
+                //      CustomRoles.KillingMachine or
+                //      CustomRoles.Fireworker or
                 //      CustomRoles.Sniper or
                 //      CustomRoles.EvilTracker or
                 //      CustomRoles.EvilGuesser or
                 //      CustomRoles.AntiAdminer or
                 //      CustomRoles.Ludopath or
                 //      CustomRoles.Godfather or
-                //      CustomRoles.Sans or
+                //      CustomRoles.Arrogance or
                 //      CustomRoles.Bomber or
                 //      CustomRoles.Nuker or
                 //      CustomRoles.Scavenger or
@@ -203,7 +208,7 @@ public static class Oracle
                 //      CustomRoles.Masochist or
                 //      CustomRoles.Innocent or
                 //      CustomRoles.Pursuer or
-                //      CustomRoles.NSerialKiller or
+                //      CustomRoles.SerialKiller or
                 //      CustomRoles.Pelican or
                 //      CustomRoles.Revolutionist or
                 //      CustomRoles.FFF or
