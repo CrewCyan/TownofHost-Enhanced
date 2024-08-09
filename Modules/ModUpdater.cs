@@ -1,13 +1,13 @@
-﻿using HarmonyLib;
 using System;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
-using System.Threading.Tasks;
 using UnityEngine;
 using static TOHE.Translator;
+using UnityEngine.Networking;
+using IEnumerator = System.Collections.IEnumerator;
 using Newtonsoft.Json.Linq;
-using System.IO.Compression;
+using Newtonsoft.Json;
 
 namespace TOHE;
 
@@ -18,43 +18,68 @@ public class ModUpdater
     private static readonly string URL_Github = "https://api.github.com/repos/0xDrMoe/TownofHost-Enhanced";
     //public static readonly string downloadTest = "https://github.com/Pietrodjaowjao/TOHEN-Contributions/releases/download/v123123123/TOHE.dll";
     public static bool hasUpdate = false;
-    public static bool hasOutdate = false;
+    //public static bool isNewer = false;
     public static bool forceUpdate = false;
     public static bool isBroken = false;
     public static bool isChecked = false;
-    public static Version latestVersion = null;
+    public static bool isFail = false;
+    public static DateTime? latestVersion = null;
     public static string latestTitle = null;
     public static string downloadUrl = null;
     public static string notice = null;
     public static GenericPopup InfoPopup;
+    public static PassiveButton updateButton;
 
-    [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start)), HarmonyPrefix]
-    [HarmonyPriority(2)]
-    public static void Start_Prefix(/*MainMenuManager __instance*/)
+    [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start)), HarmonyPostfix, HarmonyPriority(Priority.VeryLow)]
+    public static void Start_Postfix(/*MainMenuManager __instance*/)
+    {
+        ResetUpdateButton();
+        if (isChecked) return;
+        //If we are not using it for now, just freaking disable it.
+
+        Main.Instance.StartCoroutine(PrefixCoroutine());
+    }
+
+    public static IEnumerator PrefixCoroutine()
     {
         NewVersionCheck();
         DeleteOldFiles();
         InfoPopup = UnityEngine.Object.Instantiate(Twitch.TwitchManager.Instance.TwitchPopup);
         InfoPopup.name = "InfoPopup";
         InfoPopup.TextAreaTMP.GetComponent<RectTransform>().sizeDelta = new(2.5f, 2f);
+
         if (!isChecked)
         {
-            bool done = CheckReleaseFromGithub(Main.BetaBuildURL.Value != "").GetAwaiter().GetResult();
-            Logger.Warn("Check for updated results: " + done, "CheckRelease");
+            yield return CheckReleaseFromGithub(Main.BetaBuildURL.Value != "");
+            Logger.Warn("Check for updated results: " + !isFail, "CheckRelease");
             Logger.Info("hasupdate: " + hasUpdate, "CheckRelease");
             Logger.Info("forceupdate: " + forceUpdate, "CheckRelease");
             Logger.Info("downloadUrl: " + downloadUrl, "CheckRelease");
             Logger.Info("latestVersionl: " + latestVersion, "CheckRelease");
-            //ShowPopup($"{done} {hasUpdate} {Main.version} {latestVersion} {forceUpdate} {downloadUrl}", StringNames.Close, true, false);
+            ResetUpdateButton();
         }
     }
-
+    public static void ResetUpdateButton()
+    {
+        if (updateButton == null)
+        {
+            updateButton = MainMenuManagerPatch.CreateButton(
+                "updateButton",
+                new(3.68f, -2.68f, 1f),
+                new(255, 165, 0, byte.MaxValue),
+                new(255, 200, 0, byte.MaxValue),
+                () => StartUpdate(downloadUrl),
+                GetString("update"));
+            updateButton.transform.localScale = Vector3.one;
+        }
+        updateButton.gameObject.SetActive(hasUpdate);
+    }
     public static string Get(string url)
     {
         string result = "";
         HttpClient req = new();
         var res = req.GetAsync(url).Result;
-        Stream stream = res.Content.ReadAsStreamAsync().Result;
+        Stream stream = res.Content.ReadAsStream();
         try
         {
             //获取内容
@@ -67,83 +92,86 @@ public class ModUpdater
         }
         return result;
     }
-    public static async Task<bool> CheckReleaseFromGithub(bool beta = false)
+    public static IEnumerator CheckReleaseFromGithub(bool beta = false)
     {
         Logger.Warn("Start checking for updates from Github", "CheckRelease");
         string url = URL_Github + "/releases/latest";
-        try
-        {
-            string result;
-            using (HttpClient client = new())
-            {
-                client.DefaultRequestHeaders.Add("User-Agent", "TOHE Updater");
-                using var response = await client.GetAsync(new Uri(url), HttpCompletionOption.ResponseContentRead);
-                if (!response.IsSuccessStatusCode || response.Content == null)
-                {
-                    Logger.Error($"Status Code: {response.StatusCode}", "CheckRelease");
-                    return false;
-                }
-                result = await response.Content.ReadAsStringAsync();
-            }
-            JObject data = JObject.Parse(result);
-            if (beta)
-            {
-                latestTitle = data["name"].ToString();
-                downloadUrl = data["url"].ToString();
-                hasUpdate = latestTitle != ThisAssembly.Git.Commit;
-            }
-            else
-            {
-                latestVersion = new(data["tag_name"]?.ToString().TrimStart('v'));
-                latestTitle = $"Ver. {latestVersion}";
-                JArray assets = data["assets"].Cast<JArray>();
-                Logger.Info(assets.ToString(), "ModUpdater");
-                for (int i = 0; i < assets.Count; i++)
-                {
-                    if (assets[i]["name"].ToString() == $"TOH-Enhanced.{latestVersion}.zip")
-                    {
-                        downloadUrl = assets[i]["browser_download_url"].ToString();
-                        break;
-                    }
-                }
-                hasUpdate = latestVersion.CompareTo(Main.version) > 0;
-                hasOutdate = latestVersion.CompareTo(Main.version) < 0;
-            }
 
-            Logger.Info("hasupdate: " + hasUpdate, "Github");
-            Logger.Info("hasoutdate: " + hasOutdate, "Github");
-            Logger.Info("forceupdate: " + forceUpdate, "Github");
-            Logger.Info("downloadUrl: " + downloadUrl, "Github");
-            Logger.Info("latestVersionl: " + latestVersion, "Github");
-            Logger.Info("latestTitle: " + latestTitle, "Github");
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        request.timeout = 15;
+        request.SetRequestHeader("Connection", "Keep-Alive");
+        request.SetRequestHeader("User-Agent", "Mozilla/5.0");
+        request.chunkedTransfer = false;
 
-            if (downloadUrl == null || downloadUrl == "")
-            {
-                Logger.Error("Failed to get download address", "CheckRelease");
-                return false;
-            }
-            isChecked = true;
-            isBroken = false;
-        }
-        catch (Exception ex)
+        yield return request.SendWebRequest();
+        yield return new WaitForSeconds(0.5f);
+
+        if (request.result != UnityWebRequest.Result.Success)
         {
-            isBroken = true;
-            Logger.Error($"Publishing Check Failure\n{ex}", "CheckRelease", false);
-            return false;
+            Logger.Error($"Request failed: {request.error}: {request.result}", "CheckRelease");
+            isFail = true;
+            yield break;
         }
-        return true;
-    }
-    public static void StartUpdate(string url, bool github)
-    {
-        ShowPopup(GetString("updatePleaseWait"), StringNames.Cancel, true, false);
-        if (!github)
+
+        string result = request.downloadHandler.text;
+
+        JObject data = JsonConvert.DeserializeObject<JObject>(result);
+
+        if (beta)
         {
-            _ = DownloadDLL(url);
+            latestTitle = data["name"].ToString();
+            downloadUrl = data["url"].ToString();
+            hasUpdate = latestTitle != ThisAssembly.Git.Commit;
         }
         else
         {
-            _ = DownloadDLLGithub(url);
+            string publishedAt = data["published_at"]?.ToString();
+            latestVersion = DateTime.TryParse(publishedAt, out DateTime parsedDate) ? parsedDate : DateTime.MinValue;
+            latestTitle = $"Day: {latestVersion?.Day} Month: {latestVersion?.Month} Year: {latestVersion?.Year}";
+
+            JArray assets = data["assets"].TryCast<JArray>();
+            for (int i = 0; i < assets.Count; i++)
+            {
+                string assetName = assets[i]["name"].ToString();
+                if (assetName.ToLower() == "tohe.dll")
+                {
+                    downloadUrl = assets[i]["browser_download_url"].ToString();
+                    Logger.Info($"Github downloadUrl is set to {downloadUrl}", "CheckRelease");
+                }
+            }
+
+            DateTime pluginTimestamp = DateTime.ParseExact(Main.PluginVersion.Substring(5, 4), "MMdd", System.Globalization.CultureInfo.InvariantCulture);
+            int year = int.Parse(Main.PluginVersion.Substring(0, 4));
+            pluginTimestamp = pluginTimestamp.AddYears(year - pluginTimestamp.Year);
+            Logger.Info($"Day: {pluginTimestamp.Day} Month: {pluginTimestamp.Month} Year: {pluginTimestamp.Year}", "PluginVersion");
+            hasUpdate = latestVersion?.Date > pluginTimestamp.Date;
         }
+
+        Logger.Info("hasupdate: " + hasUpdate, "Github");
+        Logger.Info("downloadUrl: " + downloadUrl, "Github");
+        Logger.Info("latestVersion: " + latestVersion, "Github");
+        Logger.Info("latestTitle: " + latestTitle, "Github");
+
+        if (hasUpdate && (downloadUrl == null || downloadUrl == ""))
+        {
+            Logger.Error("Failed to get download address", "CheckRelease");
+            isFail = true;
+            yield break;
+        }
+
+        isChecked = true;
+        isBroken = false;
+
+        // Manually dispose of the UnityWebRequest instance
+        request.Dispose();
+
+        isFail = false;
+        yield break;
+    }
+    public static void StartUpdate(string url)
+    {
+        ShowPopup(GetString("updatePleaseWait"), StringNames.Cancel, false);
+        Main.Instance.StartCoroutine(DownloadDLL(url));
         return;
     }
     public static bool NewVersionCheck()
@@ -164,6 +192,22 @@ public class ModUpdater
             return false;
         }
         return true;
+    }
+    public static void StopDownload()
+    {
+        cachedfileStream.Dispose();
+        Main.Instance.StopAllCoroutines();
+        Main.Instance.StartCoroutine(DeleteFilesAfterCancel());
+    }
+    public static IEnumerator DeleteFilesAfterCancel()
+    {
+        ShowPopup(GetString("deletingFiles"), StringNames.None, false);
+        yield return new WaitForSeconds(2f);
+        InfoPopup.Close();
+        yield return new WaitForSeconds(0.3f);
+        DeleteOldFiles();
+        Application.targetFrameRate = Main.UnlockFPS.Value ? 165 : 60;
+        yield break;
     }
     public static void DeleteOldFiles()
     {
@@ -187,131 +231,68 @@ public class ModUpdater
         }
     }
     private static readonly object downloadLock = new();
-    public static async Task<bool> DownloadDLL(string url)
+    private static FileStream cachedfileStream;
+
+    private static IEnumerator DownloadDLL(string url)
     {
-        try
+        var savePath = "BepInEx/plugins/TOHE.dll.temp";
+        Application.targetFrameRate = -1;
+
+        // Delete the temporary file if it exists
+        DeleteOldFiles();
+
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        request.timeout = 10;
+        request.SetRequestHeader("Connection", "Keep-Alive");
+        request.SetRequestHeader("User-Agent", "Mozilla/5.0");
+        request.chunkedTransfer = false;
+        yield return request.SendWebRequest();
+
+        if (request.result != UnityWebRequest.Result.Success)
         {
-            var savePath = "BepInEx/plugins/TOHE.dll.temp";
+            Logger.Error($"File retrieval failed with status code: {request.responseCode}", "DownloadDLL", false);
+            ShowPopup(GetString("updateManually"), StringNames.Close, true, InfoPopup.Close);
+            Application.targetFrameRate = Main.UnlockFPS.Value ? 165 : 60;
+            yield break;
+        }
 
-            // Delete the temporary file if it exists
-            if (File.Exists(savePath))
-            {
-                File.Delete(savePath);
-            }
-
-            HttpResponseMessage response;
-            var downloadCallBack = DownloadCallBack;
-
-            using (HttpClient client = new())
-            {
-                response = await client.GetAsync(url);
-            }
-
-            if (response == null || !response.IsSuccessStatusCode)
-            {
-                throw new Exception($"File retrieval failed with status code: {response?.StatusCode}");
-            }
-
-            var total = response.Content.Headers.ContentLength ?? 0;
-            using (var stream = await response.Content.ReadAsStreamAsync())
+        var total = request.downloadedBytes;
+        using (var stream = new MemoryStream(request.downloadHandler.data))
+        {
             using (var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
             {
-                if (downloadCallBack == null)
-                {
-                    await stream.CopyToAsync(fileStream);
-                }
-                else
-                {
-                    byte[] buffer = new byte[1024];
-                    long readLength = 0;
-                    int length;
+                cachedfileStream = fileStream;
+                byte[] buffer = new byte[1024];
+                long readLength = 0;
+                int length;
 
-                    while ((length = await stream.ReadAsync(buffer, 0, buffer.Length)) != 0)
+                while ((length = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    yield return null;
+
+                    fileStream.Write(buffer, 0, length);
+
+                    readLength += length;
+                    double? progress = Math.Round((double)readLength / total * 100, 2, MidpointRounding.ToZero);
+
+                    lock (downloadLock)
                     {
-                        await fileStream.WriteAsync(buffer, 0, length);
-
-                        readLength += length;
-                        double? progress = Math.Round((double)readLength / total * 100, 2, MidpointRounding.ToZero);
+                        DownloadCallBack(total, readLength, progress ?? 0); // Call back with progress info
                     }
                 }
             }
+        }
 
-            var fileName = Assembly.GetExecutingAssembly().Location;
-            File.Move(fileName, fileName + ".bak");
-            File.Move(savePath, fileName);
-            ShowPopup(GetString("updateRestart"), StringNames.Close, true, true);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Update failed\n{ex}", "DownloadDLL", false);
-            ShowPopup(GetString("updateManually"), StringNames.Close, true, true);
-            return false;
-        }
-        return true;
+        var fileName = Assembly.GetExecutingAssembly().Location;
+        File.Move(fileName, fileName + ".bak");
+        File.Move(savePath, fileName);
+        ShowPopup(GetString("updateRestart"), StringNames.Close, true, Application.Quit);
     }
-    public static async Task<bool> DownloadDLLGithub(string url)
+    private static void DownloadCallBack(ulong total, long downloaded, double progress)
     {
-        try
-        {
-            var savePath = "BepInEx/plugins/TOHE.dll.temp";
-
-            // Delete the temporary file if it exists
-            if (File.Exists(savePath))
-            {
-                File.Delete(savePath);
-            }
-
-            HttpResponseMessage response;
-            var downloadCallBack = DownloadCallBack;
-
-            using (HttpClient client = new())
-            {
-                response = await client.GetAsync(url);
-            }
-
-            if (response == null || !response.IsSuccessStatusCode)
-            {
-                throw new Exception($"File retrieval failed with status code: {response?.StatusCode}");
-            }
-
-            var total = response.Content.Headers.ContentLength ?? 0;
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
-            {
-                // Specify the relative path within the ZIP archive where "TOHE.dll" is located
-                var entryPath = "BepInEx/plugins/TOHE.dll";
-                var entry = archive.GetEntry(entryPath);
-
-                if (entry == null)
-                {
-                    throw new Exception($"'{entryPath}' not found in the ZIP archive");
-                }
-
-                // Extract "TOHE.dll" to the temporary file
-                using (var entryStream = entry.Open())
-                using (var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
-                {
-                    await entryStream.CopyToAsync(fileStream);
-                }
-            }
-
-            var fileName = Assembly.GetExecutingAssembly().Location;
-            File.Move(fileName, fileName + ".bak");
-            File.Move(savePath, fileName);
-            ShowPopup(GetString("updateRestart"), StringNames.Close, true, true);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Update failed\n{ex}", "DownloadDLL", false);
-            ShowPopup(GetString("updateManually"), StringNames.Close, true, true);
-            return false;
-        }
-        return true;
+        ShowPopup($"{GetString("updateInProgress")}\n{downloaded / (1024f * 1024f):F2}/{total / (1024f * 1024f):F2} MB ({progress}%)", StringNames.Cancel, true, StopDownload);
     }
-    private static void DownloadCallBack(long total, long downloaded, double progress)
-    {
-    }
-    private static void ShowPopup(string message, StringNames buttonText, bool showButton = false, bool buttonIsExit = true)
+    private static void ShowPopup(string message, StringNames buttonText, bool showButton = false, Action onClick = null)
     {
         if (InfoPopup != null)
         {
@@ -323,7 +304,7 @@ public class ModUpdater
                 button.GetChild(0).GetComponent<TextTranslatorTMP>().TargetText = buttonText;
                 button.GetChild(0).GetComponent<TextTranslatorTMP>().ResetText();
                 button.GetComponent<PassiveButton>().OnClick = new();
-                if (buttonIsExit) button.GetComponent<PassiveButton>().OnClick.AddListener((Action)(() => Application.Quit()));
+                if (onClick != null) button.GetComponent<PassiveButton>().OnClick.AddListener(onClick);
                 else button.GetComponent<PassiveButton>().OnClick.AddListener((Action)(() => InfoPopup.Close()));
             }
         }

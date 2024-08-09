@@ -1,86 +1,98 @@
+using AmongUs.GameOptions;
 using Hazel;
-using System.Collections.Generic;
-using System.Linq;
 using TOHE.Modules;
-using TOHE.Roles.Crewmate;
-using TOHE.Roles.Neutral;
 using UnityEngine;
 using static TOHE.Translator;
 
 namespace TOHE.Roles.Impostor;
 
-public static class Sniper
+internal class Sniper : RoleBase
 {
-    private static readonly int Id = 2400;
-    private static List<byte> PlayerIdList = [];
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 2400;
+    private static readonly HashSet<byte> PlayerIdList = [];
+    public static bool HasEnabled => PlayerIdList.Any();
+    
+    public override CustomRoles ThisRoleBase => CustomRoles.Shapeshifter;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.ImpostorKilling;
+    //==================================================================\\
 
     private static OptionItem SniperBulletCount;
     private static OptionItem SniperPrecisionShooting;
     private static OptionItem SniperAimAssist;
     private static OptionItem SniperAimAssistOnshot;
-    public static OptionItem CanKillWithBullets;
-    public static Dictionary<byte, byte> snipeTarget = [];
-    private static Dictionary<byte, Vector3> snipeBasePosition = [];
-    private static Dictionary<byte, Vector3> LastPosition = [];
-    private static Dictionary<byte, int> bulletCount = [];
-    private static Dictionary<byte, List<byte>> shotNotify = [];
-    private static Dictionary<byte, bool> IsAim = [];
-    private static Dictionary<byte, float> AimTime = [];
+    private static OptionItem CanKillWithBullets;
+    //private static OptionItem AlwaysShowShapeshiftAnimations;
+
+    private static readonly Dictionary<byte, byte> snipeTarget = [];
+    private static readonly Dictionary<byte, Vector3> snipeBasePosition = [];
+    private static readonly Dictionary<byte, Vector3> LastPosition = [];
+    private static readonly Dictionary<byte, int> bulletCount = [];
+    private static readonly Dictionary<byte, List<byte>> shotNotify = [];
+    private static readonly Dictionary<byte, bool> IsAim = [];
+    private static readonly Dictionary<byte, float> AimTime = [];
+
     private static bool meetingReset;
     private static int maxBulletCount;
     private static bool precisionShooting;
     private static bool AimAssist;
     private static bool AimAssistOneshot;
-    public static void SetupCustomOption()
+    private static bool SniperCanUseKillButton;
+
+    public override void SetupCustomOption()
     {
-        Options.SetupRoleOptions(Id, TabGroup.ImpostorRoles, CustomRoles.Sniper);
+        Options.SetupSingleRoleOptions(Id, TabGroup.ImpostorRoles, CustomRoles.Sniper, 1);
         SniperBulletCount = IntegerOptionItem.Create(Id + 10, "SniperBulletCount", new(1, 20, 1), 2, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Sniper])
             .SetValueFormat(OptionFormat.Pieces);
         SniperPrecisionShooting = BooleanOptionItem.Create(Id + 11, "SniperPrecisionShooting", false, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Sniper]);
         SniperAimAssist = BooleanOptionItem.Create(Id + 12, "SniperAimAssist", true, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Sniper]);
         SniperAimAssistOnshot = BooleanOptionItem.Create(Id + 13, "SniperAimAssistOneshot", false, TabGroup.ImpostorRoles, false).SetParent(SniperAimAssist);
         CanKillWithBullets = BooleanOptionItem.Create(Id + 14, "SniperCanKill", false, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Sniper]);
+        //AlwaysShowShapeshiftAnimations = BooleanOptionItem.Create(Id + 15, GeneralOption.ShowShapeshiftAnimations, true, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Sniper]);
     }
-    public static void Init()
+    public override void Init()
     {
         Logger.Disable("Sniper");
 
-        PlayerIdList = [];
+        PlayerIdList.Clear();
 
-        snipeBasePosition = [];
-        LastPosition = [];
-        snipeTarget = [];
-        bulletCount = [];
-        shotNotify = [];
-        IsAim = [];
-        AimTime = [];
+        snipeBasePosition.Clear();
+        LastPosition.Clear();
+        snipeTarget.Clear();
+        bulletCount.Clear();
+        shotNotify.Clear();
+        IsAim.Clear();
+        AimTime.Clear();
         meetingReset = false;
-        IsEnable = false;
+    }
+    public override void Add(byte playerId)
+    {
+        PlayerIdList.Add(playerId);
 
         maxBulletCount = SniperBulletCount.GetInt();
         precisionShooting = SniperPrecisionShooting.GetBool();
         AimAssist = SniperAimAssist.GetBool();
         AimAssistOneshot = SniperAimAssistOnshot.GetBool();
-    }
-    public static void Add(byte playerId)
-    {
-        PlayerIdList.Add(playerId);
-        IsEnable = true;
+        SniperCanUseKillButton = CanKillWithBullets.GetBool();
 
         snipeBasePosition[playerId] = new();
         LastPosition[playerId] = new();
         snipeTarget[playerId] = 0x7F;
         bulletCount[playerId] = maxBulletCount;
-        shotNotify[playerId] = new();
+        shotNotify[playerId] = [];
         IsAim[playerId] = false;
         AimTime[playerId] = 0f;
+
     }
-    public static bool IsThisRole(byte playerId) => PlayerIdList.Contains(playerId);
-    public static void SendRPC(byte playerId)
+
+    private static bool IsThisRole(byte playerId) => PlayerIdList.Contains(playerId);
+
+    public static bool SnipeIsActive(byte playerId) => snipeTarget.ContainsValue(playerId);
+
+    private static void SendRPC(byte playerId)
     {
         Logger.Info($"Player{playerId}:SendRPC", "Sniper");
-        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SniperSync, Hazel.SendOption.Reliable, -1);
+        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SniperSync, SendOption.Reliable, -1);
         writer.Write(playerId);
         var snList = shotNotify[playerId];
         writer.Write(snList.Count);
@@ -90,7 +102,6 @@ public static class Sniper
         }
         AmongUsClient.Instance.FinishRpcImmediately(writer);
     }
-
     public static void ReceiveRPC(MessageReader msg)
     {
         var playerId = msg.ReadByte();
@@ -103,7 +114,12 @@ public static class Sniper
         }
         Logger.Info($"Player{playerId}:ReceiveRPC", "Sniper");
     }
-    public static bool CanUseKillButton(PlayerControl pc)
+    public override void ApplyGameOptions(IGameOptions opt, byte playerId)
+    {
+        AURoleOptions.ShapeshifterCooldown = /*!AlwaysShowShapeshiftAnimations.GetBool() ? 1f :*/ Options.DefaultShapeshiftCooldown.GetFloat();
+        //AURoleOptions.ShapeshifterDuration = 1f;
+    }
+    public override bool CanUseKillButton(PlayerControl pc)
     {
         if (!pc.IsAlive()) return false;
         var canUse = false;
@@ -116,7 +132,7 @@ public static class Sniper
         {
             canUse = true;
         }
-        if (CanKillWithBullets.GetBool())
+        if (SniperCanUseKillButton)
         {
             canUse = true;
         }
@@ -124,7 +140,7 @@ public static class Sniper
         Logger.Info($" CanUseKillButton:{canUse}", "Sniper");
         return canUse;
     }
-    public static Dictionary<PlayerControl, float> GetSnipeTargets(PlayerControl sniper)
+    private static Dictionary<PlayerControl, float> GetSnipeTargets(PlayerControl sniper)
     {
         var targets = new Dictionary<PlayerControl, float>();
         //変身開始地点→解除地点のベクトル
@@ -176,16 +192,14 @@ public static class Sniper
         return targets;
 
     }
-    public static void OnShapeshift(PlayerControl pc, bool shapeshifting)
+    public override void OnShapeshift(PlayerControl shapeshifter, PlayerControl target, bool animate, bool shapeshifting)
     {
-        if (!IsThisRole(pc.PlayerId) || !pc.IsAlive()) return;
-
-        var sniper = pc;
+        var sniper = shapeshifter;
         var sniperId = sniper.PlayerId;
 
         if (bulletCount[sniperId] <= 0) return;
 
-        //スナイパーで弾が残ってたら
+        // first shapeshift
         if (shapeshifting)
         {
             //Aim開始
@@ -216,7 +230,7 @@ public static class Sniper
         bulletCount[sniperId]--;
 
         //命中判定はホストのみ行う
-        if (!AmongUsClient.Instance.AmHost || Pelican.IsEaten(pc.PlayerId) || Medic.ProtectList.Contains(pc.PlayerId)) return;
+        if (!AmongUsClient.Instance.AmHost) return;
 
         sniper.RPCPlayCustomSound("AWP");
 
@@ -248,20 +262,20 @@ public static class Sniper
             SendRPC(sniperId);
 
             _ = new LateTask(() =>
+            {
+                snList.Clear();
+                foreach (var otherPc in targets.Keys)
                 {
-                    snList.Clear();
-                    foreach (var otherPc in targets.Keys)
-                    {
-                        Utils.NotifyRoles(SpecifySeer: otherPc);
-                    }
-                    SendRPC(sniperId);
-                },
+                    Utils.NotifyRoles(SpecifySeer: otherPc);
+                }
+                SendRPC(sniperId);
+            },
                 0.5f, "Sniper shot Notify");
         }
     }
-    public static void OnFixedUpdate(PlayerControl pc)
+    public static void OnFixedUpdateGlobal(PlayerControl pc)
     {
-        if (!IsThisRole(pc.PlayerId) || !pc.IsAlive()) return;
+        if (!HasEnabled || !IsThisRole(pc.PlayerId) || !pc.IsAlive()) return;
 
         if (!AimAssist) return;
 
@@ -289,13 +303,13 @@ public static class Sniper
             Utils.NotifyRoles(SpecifySeer: sniper);
         }
     }
-    public static void OnReportDeadBody()
+    public override void OnReportDeadBody(PlayerControl reporter, NetworkedPlayerInfo target)
     {
         meetingReset = true;
     }
-    public static string GetBulletCount(byte playerId)
+    public override string GetProgressText(byte playerId, bool comms)
     {
-        return IsThisRole(playerId) ? Utils.ColorString(Color.yellow, $"({bulletCount[playerId]})") : "";
+        return Utils.ColorString(Color.yellow, $"({bulletCount[playerId]})");
     }
     public static bool TryGetSniper(byte targetId, ref PlayerControl sniper)
     {
@@ -309,38 +323,47 @@ public static class Sniper
         }
         return false;
     }
-    public static string GetShotNotify(byte seerId)
+    public override string GetMark(PlayerControl seer, PlayerControl seen = null, bool isForMeeting = false)
     {
-        if (!IsEnable) return "";
+        if (isForMeeting) return string.Empty;
+        seen ??= seer;
+        var sniper = Utils.GetPlayerById(PlayerIdList.First());
+        if (!(sniper == seer) || !(sniper == seen)) return string.Empty;
+        
+        var seerId = seer.PlayerId;
 
-        if (AimAssist && IsThisRole(seerId))
+        if (AimAssist)
         {
             //エイムアシスト中のスナイパー
             if (0.5f < AimTime[seerId] && (!AimAssistOneshot || AimTime[seerId] < 1.0f))
             {
-                if (GetSnipeTargets(Utils.GetPlayerById(seerId)).Count > 0)
+                if (GetSnipeTargets(Utils.GetPlayerById(seerId)).Any())
                 {
                     return $"<size=200%>{Utils.ColorString(Palette.ImpostorRed, "◎")}</size>";
                 }
             }
         }
-        else
+        return string.Empty;
+    }
+    public override string GetMarkOthers(PlayerControl seer, PlayerControl seen = null, bool isForMeeting = false)
+    {
+        if (isForMeeting) return string.Empty;
+
+        //各スナイパーから
+        foreach (var sniper in PlayerIdList)
         {
             //射撃音が聞こえるプレイヤー
-            foreach (var sniperId in PlayerIdList)
+            var snList = shotNotify[sniper];
+            if (snList.Any() && snList.Contains(seer.PlayerId))
             {
-                var snList = shotNotify[sniperId];
-                if (snList.Count > 0 && snList.Contains(seerId))
-                {
-                    return $"<size=200%>{Utils.ColorString(Palette.ImpostorRed, "!")}</size>";
-                }
+                return $"<size=200%>{Utils.ColorString(Palette.ImpostorRed, "!")}</size>";
             }
         }
-        return "";
+        return string.Empty;
     }
-    public static void OverrideShapeText(byte id)
+    public override void SetAbilityButtonText(HudManager hud, byte playerId)
     {
-        if (IsThisRole(id))
-            HudManager.Instance.AbilityButton.OverrideText(GetString(bulletCount[id] <= 0 ? "DefaultShapeshiftText" : "SniperSnipeButtonText"));
+        if (IsThisRole(playerId))
+            hud.AbilityButton?.OverrideText(GetString(bulletCount[playerId] <= 0 ? "DefaultShapeshiftText" : "SniperSnipeButtonText"));
     }
 }

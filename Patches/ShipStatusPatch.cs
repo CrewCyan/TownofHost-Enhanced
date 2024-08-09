@@ -1,12 +1,9 @@
-using HarmonyLib;
 using Hazel;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using TOHE.Roles.Crewmate;
+using UnityEngine;
 using TOHE.Roles.AddOns.Common;
 using TOHE.Roles.Neutral;
-using UnityEngine;
+using TOHE.Roles.Core;
 using static TOHE.Translator;
 
 namespace TOHE;
@@ -37,7 +34,13 @@ public static class MessageReaderUpdateSystemPatch
 {
     public static bool Prefix(ShipStatus __instance, [HarmonyArgument(0)] SystemTypes systemType, [HarmonyArgument(1)] PlayerControl player, [HarmonyArgument(2)] MessageReader reader)
     {
-        if (systemType is SystemTypes.Ventilation) return true;
+        if (systemType is 
+            SystemTypes.Ventilation
+            or SystemTypes.Security
+            or SystemTypes.Decontamination
+            or SystemTypes.Decontamination2
+            or SystemTypes.Decontamination3) return true;
+
         if (GameStates.IsHideNSeek) return true;
 
         var amount = MessageReader.Get(reader).ReadByte();
@@ -47,29 +50,35 @@ public static class MessageReaderUpdateSystemPatch
             return false;
         }
 
-        return RepairSystemPatch.Prefix(__instance, systemType, player, amount);
+        return UpdateSystemPatch.Prefix(__instance, systemType, player, amount);
     }
     public static void Postfix(ShipStatus __instance, [HarmonyArgument(0)] SystemTypes systemType, [HarmonyArgument(1)] PlayerControl player, [HarmonyArgument(2)] MessageReader reader)
     {
-        if (systemType is SystemTypes.Ventilation) return;
+        if (systemType is
+            SystemTypes.Ventilation
+            or SystemTypes.Security
+            or SystemTypes.Decontamination
+            or SystemTypes.Decontamination2
+            or SystemTypes.Decontamination3) return;
+
         if (GameStates.IsHideNSeek) return;
 
-        RepairSystemPatch.Postfix(__instance, systemType, player, MessageReader.Get(reader).ReadByte());
+        UpdateSystemPatch.Postfix(__instance, systemType, player, MessageReader.Get(reader).ReadByte());
     }
 }
 [HarmonyPatch(typeof(ShipStatus), nameof(ShipStatus.UpdateSystem), typeof(SystemTypes), typeof(PlayerControl), typeof(byte))]
-class RepairSystemPatch
+class UpdateSystemPatch
 {
     public static bool Prefix(ShipStatus __instance,
         [HarmonyArgument(0)] SystemTypes systemType,
         [HarmonyArgument(1)] PlayerControl player,
         [HarmonyArgument(2)] byte amount)
     {
-        Logger.Msg("SystemType: " + systemType.ToString() + ", PlayerName: " + player.GetNameWithRole().RemoveHtmlTags() + ", amount: " + amount, "RepairSystem");
+        Logger.Msg($"SystemType: {systemType}, PlayerName: {player.GetNameWithRole().RemoveHtmlTags()}, amount: {amount}", "ShipStatus.UpdateSystem");
 
         if (RepairSender.enabled && AmongUsClient.Instance.NetworkMode != NetworkModes.OnlineGame)
         {
-            Logger.SendInGame("SystemType: " + systemType.ToString() + ", PlayerName: " + player.GetNameWithRole().RemoveHtmlTags() + ", amount: " + amount);
+            Logger.SendInGame($"SystemType: {systemType}, PlayerName: {player.GetNameWithRole().RemoveHtmlTags()}, amount: {amount}");
         }
 
         if (!AmongUsClient.Instance.AmHost) return true;
@@ -82,47 +91,23 @@ class RepairSystemPatch
 
         // ###### Roles/Add-ons During Sabotages ######
 
-        if (Quizmaster.IsEnable)
-            Quizmaster.OnSabotageCall(systemType);
-
-
-        if (player.Is(CustomRoles.Fool) && !Main.MeetingIsStarted && 
-            systemType != SystemTypes.Sabotage &&
-            (systemType is
-                SystemTypes.Reactor or
-                SystemTypes.Laboratory or
-                SystemTypes.HeliSabotage or
-                SystemTypes.LifeSupp or
-                SystemTypes.Comms or
-                SystemTypes.Electrical))
+        if (Fool.IsEnable && Fool.BlockFixSabotage(player, systemType))
         {
             return false;
-        }
-
-
-        // Fast fix critical saboatge
-        switch (player.GetCustomRole())
-        {
-            case CustomRoles.SabotageMaster:
-                SabotageMaster.UpdateSystem(__instance, systemType, amount, player.PlayerId);
-                break;
-            case CustomRoles.Alchemist when Alchemist.FixNextSabo:
-                Alchemist.UpdateSystem(systemType, amount);
-                break;
         }
 
 
         if (player.Is(CustomRoles.Unlucky) && player.IsAlive()
             && (systemType is SystemTypes.Doors))
         {
-            var Ue = IRandom.Instance;
-            if (Ue.Next(1, 100) <= Options.UnluckySabotageSuicideChance.GetInt())
-            {
-                Main.PlayerStates[player.PlayerId].deathReason = PlayerState.DeathReason.Suicide;
-                player.RpcMurderPlayerV3(player);
+            if (Unlucky.SuicideRand(player, Unlucky.StateSuicide.OpenDoor)) 
                 return false;
-            }
         }
+
+        player.GetRoleClass()?.UpdateSystem(__instance, systemType, amount, player);
+
+        if (Quizmaster.HasEnabled)
+            Quizmaster.OnSabotageCall(systemType);
 
         return true;
     }
@@ -140,19 +125,7 @@ class RepairSystemPatch
             var SwitchSystem = ShipStatus.Instance.Systems[SystemTypes.Electrical].Cast<SwitchSystem>();
             if (SwitchSystem != null && SwitchSystem.IsActive)
             {
-                switch (player.GetCustomRole())
-                {
-                    case CustomRoles.SabotageMaster:
-                        Logger.Info($"{player.GetNameWithRole().RemoveHtmlTags()} instant-fix-lights", "SwitchSystem");
-                        SabotageMaster.SwitchSystemRepair(SwitchSystem, amount, player.PlayerId);
-                        break;
-                    case CustomRoles.Alchemist when Alchemist.FixNextSabo:
-                        Logger.Info($"{player.GetNameWithRole().RemoveHtmlTags()} instant-fix-lights", "SwitchSystem");
-                        SwitchSystem.ActualSwitches = 0;
-                        SwitchSystem.ExpectedSwitches = 0;
-                        Alchemist.FixNextSabo = false;
-                        break;
-                }
+                player.GetRoleClass()?.SwitchSystemUpdate(SwitchSystem, amount, player);
             }
         }
     }
@@ -175,13 +148,20 @@ class RepairSystemPatch
     }
 }
 [HarmonyPatch(typeof(ShipStatus), nameof(ShipStatus.CloseDoorsOfType))]
-class CloseDoorsPatch
+class ShipStatusCloseDoorsPatch
 {
-    public static bool Prefix(/*ShipStatus __instance*/)
+    public static bool Prefix(/*ShipStatus __instance,*/ SystemTypes room)
     {
+        Logger.Info($"Trying to close the door in the room: {room}", "CloseDoorsOfType");
+
         bool allow;
         if (Options.CurrentGameMode == CustomGameMode.FFA || Options.DisableCloseDoor.GetBool()) allow = false;
         else allow = true;
+
+        if (allow)
+        {
+            Logger.Info($"The door is closed in room: {room}", "CloseDoorsOfType");
+        }
         return allow;
     }
 }
@@ -193,7 +173,7 @@ class StartPatch
         Logger.CurrentMethod();
         Logger.Info("-----------Start of game-----------", "Phase");
 
-        Utils.CountAlivePlayers(true);
+        Utils.CountAlivePlayers(sendLog: true, checkGameEnd: false);
 
         if (Options.AllowConsole.GetBool() && PlayerControl.LocalPlayer.FriendCode.GetDevUser().DeBug)
         {
@@ -208,17 +188,41 @@ class StartPatch
                 Logger.SendInGame(GetString("Warning.CanNotUseBepInExConsole"));
             }
         }
+
+        if (GameStates.PolusIsActive && Main.EnableCustomDecorations.Value)
+        {
+            var Dropship = GameObject.Find("Dropship/panel_fuel");
+            if (Dropship != null)
+            {
+                var Decorations = UnityEngine.Object.Instantiate(Dropship, GameObject.Find("Dropship")?.transform);
+                Decorations.name = "Dropship_Decorations";
+                Decorations.transform.DestroyChildren();
+                UnityEngine.Object.Destroy(Decorations.GetComponent<Console>());
+                UnityEngine.Object.Destroy(Decorations.GetComponent<BoxCollider2D>());
+                UnityEngine.Object.Destroy(Decorations.GetComponent<PassiveButton>());
+                Decorations.GetComponent<SpriteRenderer>().sprite = Utils.LoadSprite("TOHE.Resources.Images.Dropship-Decorations.png", 100f);
+                Decorations.transform.SetSiblingIndex(1);
+                Decorations.transform.localPosition = new(0.0709f, 0.73f);
+            }
+        }
     }
 }
 [HarmonyPatch(typeof(ShipStatus), nameof(ShipStatus.StartMeeting))]
 class StartMeetingPatch
 {
-    public static void Prefix(ShipStatus __instance, PlayerControl reporter, GameData.PlayerInfo target)
+    public static void Prefix(ShipStatus __instance, PlayerControl reporter, NetworkedPlayerInfo target)
     {
         if (GameStates.IsHideNSeek) return;
 
         MeetingStates.ReportTarget = target;
         MeetingStates.DeadBodies = UnityEngine.Object.FindObjectsOfType<DeadBody>();
+    }
+    public static void Postfix()
+    {
+        foreach (var state in Main.PlayerStates.Values)
+        {
+            state.HasSpawned = false;
+        }
     }
 }
 [HarmonyPatch(typeof(ShipStatus), nameof(ShipStatus.Begin))]

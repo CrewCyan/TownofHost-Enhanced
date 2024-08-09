@@ -1,7 +1,5 @@
-﻿using HarmonyLib;
-using Hazel;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Hazel;
+using System;
 using TOHE.Modules;
 using UnityEngine;
 using static TOHE.Translator;
@@ -39,46 +37,46 @@ internal static class FFAManager
 
     public static void SetupCustomOption()
     {
-        FFA_GameTime = IntegerOptionItem.Create(67_223_001, "FFA_GameTime", new(30, 600, 10), 300, TabGroup.GameSettings, false)
+        FFA_GameTime = IntegerOptionItem.Create(67_223_001, "FFA_GameTime", new(30, 600, 10), 300, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue))
             .SetValueFormat(OptionFormat.Seconds)
             .SetHeader(true);
-        FFA_KCD = FloatOptionItem.Create(67_223_002, "FFA_KCD", new(1f, 60f, 1f), 10f, TabGroup.GameSettings, false)
+        FFA_KCD = FloatOptionItem.Create(67_223_002, "FFA_KCD", new(1f, 60f, 1f), 10f, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue))
             .SetValueFormat(OptionFormat.Seconds);
-        FFA_DisableVentingWhenTwoPlayersAlive = BooleanOptionItem.Create(67_223_003, "FFA_DisableVentingWhenTwoPlayersAlive", true, TabGroup.GameSettings, false)
+        FFA_DisableVentingWhenTwoPlayersAlive = BooleanOptionItem.Create(67_223_003, "FFA_DisableVentingWhenTwoPlayersAlive", true, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue));
-        FFA_DisableVentingWhenKCDIsUp = BooleanOptionItem.Create(67_223_004, "FFA_DisableVentingWhenKCDIsUp", true, TabGroup.GameSettings, false)
+        FFA_DisableVentingWhenKCDIsUp = BooleanOptionItem.Create(67_223_004, "FFA_DisableVentingWhenKCDIsUp", true, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue));
-        FFA_EnableRandomAbilities = BooleanOptionItem.Create(67_223_005, "FFA_EnableRandomAbilities", true, TabGroup.GameSettings, false)
+        FFA_EnableRandomAbilities = BooleanOptionItem.Create(67_223_005, "FFA_EnableRandomAbilities", true, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue));
-        FFA_ShieldDuration = FloatOptionItem.Create(67_223_006, "FFA_ShieldDuration", new(1f, 70f, 1f), 7f, TabGroup.GameSettings, false)
+        FFA_ShieldDuration = FloatOptionItem.Create(67_223_006, "FFA_ShieldDuration", new(1f, 70f, 1f), 7f, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue))
             .SetValueFormat(OptionFormat.Seconds);
-        FFA_IncreasedSpeed = FloatOptionItem.Create(67_223_007, "FFA_IncreasedSpeed", new(0.1f, 5f, 0.1f), 1.5f, TabGroup.GameSettings, false)
-            .SetGameMode(CustomGameMode.FFA)
-            .SetColor(new Color32(0, 255, 165, byte.MaxValue))
-            .SetValueFormat(OptionFormat.Multiplier);
-        FFA_DecreasedSpeed = FloatOptionItem.Create(67_223_008, "FFA_DecreasedSpeed", new(0.1f, 5f, 0.1f), 1f, TabGroup.GameSettings, false)
+        FFA_IncreasedSpeed = FloatOptionItem.Create(67_223_007, "FFA_IncreasedSpeed", new(0.1f, 5f, 0.1f), 1.5f, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue))
             .SetValueFormat(OptionFormat.Multiplier);
-        FFA_ModifiedSpeedDuration = FloatOptionItem.Create(67_223_009, "FFA_ModifiedSpeedDuration", new(1f, 60f, 1f), 10f, TabGroup.GameSettings, false).SetGameMode(CustomGameMode.FFA).SetColor(new Color32(0, 255, 165, byte.MaxValue))
-            .SetValueFormat(OptionFormat.Seconds);
-        FFA_LowerVision = FloatOptionItem.Create(67_223_010, "FFA_LowerVision", new(0f, 1f, 0.05f), 0.5f, TabGroup.GameSettings, false).SetGameMode(CustomGameMode.FFA).SetColor(new Color32(0, 255, 165, byte.MaxValue))
+        FFA_DecreasedSpeed = FloatOptionItem.Create(67_223_008, "FFA_DecreasedSpeed", new(0.1f, 5f, 0.1f), 1f, TabGroup.ModSettings, false)
+            .SetGameMode(CustomGameMode.FFA)
+            .SetColor(new Color32(0, 255, 165, byte.MaxValue))
             .SetValueFormat(OptionFormat.Multiplier);
-        FFA_ModifiedVisionDuration = FloatOptionItem.Create(67_223_011, "FFA_ModifiedVisionDuration", new(1f, 70f, 1f), 5f, TabGroup.GameSettings, false).SetGameMode(CustomGameMode.FFA).SetColor(new Color32(0, 255, 165, byte.MaxValue))
+        FFA_ModifiedSpeedDuration = FloatOptionItem.Create(67_223_009, "FFA_ModifiedSpeedDuration", new(1f, 60f, 1f), 10f, TabGroup.ModSettings, false).SetGameMode(CustomGameMode.FFA).SetColor(new Color32(0, 255, 165, byte.MaxValue))
             .SetValueFormat(OptionFormat.Seconds);
-        FFA_EnableRandomTwists = BooleanOptionItem.Create(67_223_012, "FFA_EnableRandomTwists", true, TabGroup.GameSettings, false)
+        FFA_LowerVision = FloatOptionItem.Create(67_223_010, "FFA_LowerVision", new(0f, 1f, 0.05f), 0.5f, TabGroup.ModSettings, false).SetGameMode(CustomGameMode.FFA).SetColor(new Color32(0, 255, 165, byte.MaxValue))
+            .SetValueFormat(OptionFormat.Multiplier);
+        FFA_ModifiedVisionDuration = FloatOptionItem.Create(67_223_011, "FFA_ModifiedVisionDuration", new(1f, 70f, 1f), 5f, TabGroup.ModSettings, false).SetGameMode(CustomGameMode.FFA).SetColor(new Color32(0, 255, 165, byte.MaxValue))
+            .SetValueFormat(OptionFormat.Seconds);
+        FFA_EnableRandomTwists = BooleanOptionItem.Create(67_223_012, "FFA_EnableRandomTwists", true, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue));
-        FFA_ShieldIsOneTimeUse = BooleanOptionItem.Create(67_223_013, "FFA_ShieldIsOneTimeUse", true, TabGroup.GameSettings, false)
+        FFA_ShieldIsOneTimeUse = BooleanOptionItem.Create(67_223_013, "FFA_ShieldIsOneTimeUse", true, TabGroup.ModSettings, false)
             .SetGameMode(CustomGameMode.FFA)
             .SetColor(new Color32(0, 255, 165, byte.MaxValue));
     }
@@ -104,7 +102,14 @@ internal static class FFAManager
 
         _ = new LateTask( ()=>
         {
-            Utils.SetChatVisible();
+            try
+            {
+                Utils.SetChatVisibleForEveryone();
+            }
+            catch (Exception error)
+            {
+                Logger.Error($"Error: {error}", "FFA Init");
+            }
             RoundTime = FFA_GameTime.GetInt() + 8;
             var now = Utils.GetTimeStamp() + 8;
             foreach (PlayerControl pc in Main.AllAlivePlayerControls)
@@ -165,7 +170,7 @@ internal static class FFAManager
         try
         {
             int ms = KBScore[playerId];
-            int rank = 1 + KBScore.Values.Where(x => x > ms).Count();
+            int rank = 1 + KBScore.Values.Count(x => x > ms);
             rank += KBScore.Where(x => x.Value == ms).ToList().IndexOf(new(playerId, ms));
             return rank;
         }
@@ -326,7 +331,7 @@ internal static class FFAManager
             FFAEnterVentTime.Remove(killer.PlayerId);
         }
 
-        killer.RpcMurderPlayerV3(target);
+        killer.RpcMurderPlayer(target);
     }
 
     public static void OnPlayerKill(PlayerControl killer)
@@ -335,6 +340,59 @@ internal static class FFAManager
             PlayerControl.LocalPlayer.KillFlash();
 
         KBScore[killer.PlayerId]++;
+    }
+
+    public static bool CheckCoEnterVent(PlayerPhysics physics, int ventId)
+    {
+        if (FFA_DisableVentingWhenTwoPlayersAlive.GetBool() && Main.AllAlivePlayerControls.Length <= 2)
+        {
+            var pc = physics?.myPlayer;
+            _ = new LateTask(() =>
+            {
+                pc?.Notify(GetString("FFA-NoVentingBecauseTwoPlayers"), 7f);
+                pc?.MyPhysics?.RpcBootFromVent(ventId);
+            }, 0.5f, "Player No Venting Because Two Players");
+            return true;
+        }
+
+        if (FFA_DisableVentingWhenKCDIsUp.GetBool())
+        {
+            var pc = physics?.myPlayer;
+            var now = Utils.GetTimeStamp();
+            FFAEnterVentTime[pc.PlayerId] = now;
+            if (!FFAVentDuration.ContainsKey(pc.PlayerId)) FFAVentDuration[pc.PlayerId] = 0;
+            var canVent = (now - FFALastKill[pc.PlayerId]) <= (Main.AllPlayerKillCooldown[pc.PlayerId] + FFAVentDuration[pc.PlayerId]);
+            Logger.Warn($"Enter Time = {now}, last kill time = {FFALastKill[pc.PlayerId]}, {FFAVentDuration[pc.PlayerId]}", "VENT DURATION TESTING");
+            Logger.Warn($"can vent {canVent}", "FFA MODE VENTING");
+            if (!canVent)
+            {
+                _ = new LateTask(() =>
+                {
+                    pc?.Notify(GetString("FFA-NoVentingBecauseKCDIsUP"), 7f);
+                    pc?.MyPhysics?.RpcBootFromVent(ventId);
+                }, 0.5f, "Player No Venting Because KCD Is UP");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void CoExitVent(PlayerControl player)
+    {
+        if (player == null) return;
+
+        var now = Utils.GetTimeStamp();
+        byte playerId = player.PlayerId;
+
+        if (FFAEnterVentTime.ContainsKey(playerId))
+        {
+            if (!FFAVentDuration.ContainsKey(playerId)) FFAVentDuration[playerId] = 0f;
+            FFAVentDuration[playerId] = FFAVentDuration[playerId] + (now - FFAEnterVentTime[playerId]);
+
+            Logger.Warn($"Vent Duration = {FFAVentDuration[playerId]}, vent enter time = {FFAEnterVentTime[playerId]}, vent exit time = {now}, vent time = {now - FFAEnterVentTime[playerId]}", "FFA VENT DURATION");
+            FFAEnterVentTime.Remove(playerId);
+        }
     }
 
     public static string GetPlayerArrow(PlayerControl seer, PlayerControl target = null)
@@ -400,7 +458,7 @@ internal static class FFAManager
                             pc.IsAlive() && !pc.inVent && a.PlayerId != pc.PlayerId && !changePositionPlayers.Contains(a.PlayerId)).ToArray();
                         if (filtered.Length == 0) break;
 
-                        PlayerControl target = filtered[rd.Next(0, filtered.Length)];
+                        PlayerControl target = filtered.RandomElement();
 
                         if (pc.inVent || target.inVent) continue;
 

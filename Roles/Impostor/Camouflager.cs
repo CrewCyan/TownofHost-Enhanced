@@ -1,47 +1,114 @@
-﻿
+﻿using AmongUs.GameOptions;
+using Hazel;
+using InnerNet;
+using TOHE.Roles.AddOns.Common;
+using UnityEngine;
+using static TOHE.Translator;
+
 namespace TOHE.Roles.Impostor;
 
-public static class Camouflager
+internal class Camouflager : RoleBase
 {
-    private static readonly int Id = 2900;
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 2900;
+    public static readonly HashSet<byte> Playerids = [];
+    public static bool HasEnabled => Playerids.Any();
+    
+    public override CustomRoles ThisRoleBase => CustomRoles.Shapeshifter;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.ImpostorSupport;
+    //==================================================================\\
 
-    private static OptionItem CamouflageCooldown;
-    private static OptionItem CamouflageDuration;
-    public static OptionItem CanUseCommsSabotage;
-    public static OptionItem DisableReportWhenCamouflageIsActive;
+    private static OptionItem CamouflageCooldownOpt;
+    private static OptionItem CamouflageDurationOpt;
+    private static OptionItem CanUseCommsSabotagOpt;
+    private static OptionItem DisableReportWhenCamouflageIsActiveOpt;
+    private static OptionItem ShowShapeshiftAnimationsOpt;
 
-    public static bool AbilityActivated;
+    public static bool AbilityActivated = false;
+    private static float CamouflageCooldown;
+    private static float CamouflageDuration;
+    private static bool CanUseCommsSabotage;
+    private static bool DisableReportWhenCamouflageIsActive;
 
-    public static void SetupCustomOption()
+    public override void SetupCustomOption()
     {
         Options.SetupRoleOptions(Id, TabGroup.ImpostorRoles, CustomRoles.Camouflager);
-        CamouflageCooldown = FloatOptionItem.Create(Id + 2, "CamouflageCooldown", new(1f, 180f, 1f), 25f, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager])
+        CamouflageCooldownOpt = FloatOptionItem.Create(Id + 2, "CamouflageCooldown", new(1f, 180f, 1f), 25f, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager])
             .SetValueFormat(OptionFormat.Seconds);
-        CamouflageDuration = FloatOptionItem.Create(Id + 4, "CamouflageDuration", new(1f, 180f, 1f), 10f, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager])
+        CamouflageDurationOpt = FloatOptionItem.Create(Id + 4, "CamouflageDuration", new(1f, 180f, 1f), 10f, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager])
             .SetValueFormat(OptionFormat.Seconds);
-        CanUseCommsSabotage = BooleanOptionItem.Create(Id + 6, "CanUseCommsSabotage", false, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager]);
-        DisableReportWhenCamouflageIsActive = BooleanOptionItem.Create(Id + 8, "DisableReportWhenCamouflageIsActive", false, TabGroup.ImpostorRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager]);
+        CanUseCommsSabotagOpt = BooleanOptionItem.Create(Id + 6, "CanUseCommsSabotage", false, TabGroup.ImpostorRoles, false)
+            .SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager]);
+        DisableReportWhenCamouflageIsActiveOpt = BooleanOptionItem.Create(Id + 8, "DisableReportWhenCamouflageIsActive", false, TabGroup.ImpostorRoles, false)
+            .SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager]);
+        ShowShapeshiftAnimationsOpt = BooleanOptionItem.Create(Id + 9, GeneralOption.ShowShapeshiftAnimations, true, TabGroup.ImpostorRoles, false)
+            .SetParent(Options.CustomRoleSpawnChances[CustomRoles.Camouflager]);
 
     }
-    public static void Init()
+    public override void Init()
     {
         AbilityActivated = false;
-        IsEnable = false;
+        Playerids.Clear();
     }
-    public static void Add()
+    public override void Add(byte playerId)
     {
-        IsEnable = true;
+        CamouflageCooldown = CamouflageCooldownOpt.GetFloat();
+        CamouflageDuration = CamouflageDurationOpt.GetFloat();
+        CanUseCommsSabotage = CanUseCommsSabotagOpt.GetBool();
+        DisableReportWhenCamouflageIsActive = DisableReportWhenCamouflageIsActiveOpt.GetBool();
+
+        Playerids.Add(playerId);
+    }
+    public override void Remove(byte playerId)
+    {
+        ClearCamouflage();
+        Playerids.Remove(playerId);
     }
 
-    public static void ApplyGameOptions()
+    private void SendRPC()
     {
-        AURoleOptions.ShapeshifterCooldown = CamouflageCooldown.GetFloat();
-        AURoleOptions.ShapeshifterDuration = CamouflageDuration.GetFloat();
+        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SyncRoleSkill, SendOption.Reliable, -1);
+        writer.WriteNetObject(_Player);
+        writer.Write(AbilityActivated);
+        AmongUsClient.Instance.FinishRpcImmediately(writer);
     }
-    public static void OnShapeshift()
+    public override void ReceiveRPC(MessageReader reader, PlayerControl pc)
     {
+        AbilityActivated = reader.ReadBoolean();
+    }
+
+    public override void ApplyGameOptions(IGameOptions opt, byte playerId)
+    {
+        AURoleOptions.ShapeshifterCooldown = CamouflageCooldown;
+        AURoleOptions.ShapeshifterDuration = CamouflageDuration;
+    }
+    public override Sprite GetAbilityButtonSprite(PlayerControl player, bool shapeshifting) => CustomButton.Get("Camo");
+    public override void SetAbilityButtonText(HudManager hud, byte playerId)
+    {
+        if (AbilityActivated)
+            hud.AbilityButton.OverrideText(GetString("CamouflagerShapeshiftTextAfterDisguise"));
+        else
+            hud.AbilityButton.OverrideText(GetString("CamouflagerShapeshiftTextBeforeDisguise"));
+    }
+    public override bool OnCheckShapeshift(PlayerControl camouflager, PlayerControl target, ref bool resetCooldown, ref bool shouldAnimate)
+    {
+        if (ShowShapeshiftAnimationsOpt.GetBool()) return true;
+
+        shouldAnimate = false;
+        return true;
+    }
+    public override void OnShapeshift(PlayerControl shapeshifter, PlayerControl target, bool IsAnimate, bool shapeshifting)
+    {
+        if (!shapeshifting)
+        {
+            ClearCamouflage();
+            return;
+        }
+
         AbilityActivated = true;
+        SendRPC();
+
+        var timer = ShowShapeshiftAnimationsOpt.GetBool() ? 1.2f : 0.5f;
 
         _ = new LateTask(() =>
         {
@@ -49,21 +116,33 @@ public static class Camouflager
             {
                 Camouflage.CheckCamouflage();
             }
-        }, 1.2f, "Camouflager Use Shapeshift");
+        }, timer, "Camouflager Use Shapeshift");
     }
-    public static void OnReportDeadBody()
+    public override void OnReportDeadBody(PlayerControl reporter, NetworkedPlayerInfo target)
     {
-        ClaerCamouflage();
+        ClearCamouflage();
     }
-    public static void IsDead()
-    {
-        if (GameStates.IsMeeting) return;
 
-        ClaerCamouflage();
+    public override void OnMurderPlayerAsTarget(PlayerControl killer, PlayerControl target, bool inMeeting, bool isSuicide)
+    {
+        if (inMeeting || !AbilityActivated) return;
+
+        ClearCamouflage();
     }
-    private static void ClaerCamouflage()
+
+    public static bool CantPressCommsSabotageButton(PlayerControl player) => player.Is(CustomRoles.Camouflager) && !CanUseCommsSabotage;
+
+    public override bool OnCheckReportDeadBody(PlayerControl reporter, NetworkedPlayerInfo deadBody, PlayerControl killer)
+    {
+        if (deadBody.Object != null && deadBody.Object.Is(CustomRoles.Bait) && Bait.BaitCanBeReportedUnderAllConditions.GetBool()) return true;
+
+        return !(DisableReportWhenCamouflageIsActive && AbilityActivated && !(Utils.IsActive(SystemTypes.Comms) && Options.CommsCamouflage.GetBool()));
+    }
+
+    private void ClearCamouflage()
     {
         AbilityActivated = false;
+        SendRPC();
         Camouflage.CheckCamouflage();
     }
 }

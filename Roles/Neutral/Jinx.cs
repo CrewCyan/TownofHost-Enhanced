@@ -1,56 +1,74 @@
 using AmongUs.GameOptions;
-using System.Collections.Generic;
+using UnityEngine;
 using static TOHE.Options;
+using TOHE.Roles.Core;
 
 namespace TOHE.Roles.Neutral;
 
-public static class Jinx
+internal class Jinx : RoleBase
 {
-    private static readonly int Id = 16800;
-    public static List<byte> playerIdList = [];
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 16800;
+    public static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Jinx);
+    public override CustomRoles ThisRoleBase => CustomRoles.Impostor;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.NeutralKilling;
+    //==================================================================\\
 
     private static OptionItem KillCooldown;
-    public static OptionItem CanVent;
+    private static OptionItem CanVent;
     private static OptionItem HasImpostorVision;
-    public static OptionItem JinxSpellTimes;
-    public static OptionItem killAttacker;
+    private static OptionItem JinxSpellTimes;
+    private static OptionItem killAttacker;
 
-    public static void SetupCustomOption()
-    
+    public override void SetupCustomOption()
     {
-        //Jinxは1人固定
         SetupSingleRoleOptions(Id, TabGroup.NeutralRoles, CustomRoles.Jinx, 1, zeroOne: false);
-        KillCooldown = FloatOptionItem.Create(Id + 10, "KillCooldown", new(0f, 180f, 2.5f), 20f, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx])
+        KillCooldown = FloatOptionItem.Create(Id + 10, GeneralOption.KillCooldown, new(0f, 180f, 2.5f), 20f, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx])
             .SetValueFormat(OptionFormat.Seconds);
-        CanVent = BooleanOptionItem.Create(Id + 11, "CanVent", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx]);
-        HasImpostorVision = BooleanOptionItem.Create(Id + 13, "ImpostorVision", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx]);
+        CanVent = BooleanOptionItem.Create(Id + 11, GeneralOption.CanVent, true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx]);
+        HasImpostorVision = BooleanOptionItem.Create(Id + 13, GeneralOption.ImpostorVision, true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx]);
         JinxSpellTimes = IntegerOptionItem.Create(Id + 14, "JinxSpellTimes", new(1, 15, 1), 3, TabGroup.NeutralRoles, false)
         .SetParent(CustomRoleSpawnChances[CustomRoles.Jinx])
         .SetValueFormat(OptionFormat.Times);
-        killAttacker = BooleanOptionItem.Create(Id + 15, "killAttacker", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx]);
+        killAttacker = BooleanOptionItem.Create(Id + 15, GeneralOption.KillAttackerWhenAbilityRemaining, true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Jinx]);
 
     }
-    public static void Init()
+    public override void Add(byte playerId)
     {
-        playerIdList = [];
-        IsEnable = false;
-    }
-    public static void Add(byte playerId)
-    {
-        playerIdList.Add(playerId);
-        IsEnable = true;
+        AbilityLimit = JinxSpellTimes.GetInt();
 
-        if (!AmongUsClient.Instance.AmHost) return;
         if (!Main.ResetCamPlayerList.Contains(playerId))
             Main.ResetCamPlayerList.Add(playerId);
     }
-    public static void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = KillCooldown.GetFloat();
-    public static void ApplyGameOptions(IGameOptions opt) => opt.SetVision(HasImpostorVision.GetBool());
-    public static void CanUseVent(PlayerControl player)
+    public override bool OnCheckMurderAsTarget(PlayerControl killer, PlayerControl target)
     {
-        bool Jinx_canUse = CanVent.GetBool();
-        DestroyableSingleton<HudManager>.Instance.ImpostorVentButton.ToggleVisible(Jinx_canUse && !player.Data.IsDead);
-        player.Data.Role.CanVent = Jinx_canUse;
+        if (AbilityLimit <= 0) return true;
+        if (killer.Is(CustomRoles.Pestilence)) return true;
+        if (killer == target) return true;
+        
+        killer.RpcGuardAndKill(target);
+        target.RpcGuardAndKill(target);
+       
+        AbilityLimit -= 1;
+        SendSkillRPC();
+
+        if (killAttacker.GetBool() && target.RpcCheckAndMurder(killer, true))
+        {
+            Logger.Info($"{target.GetNameWithRole()}: ability left {AbilityLimit}", "Jinx");
+            killer.SetDeathReason(PlayerState.DeathReason.Jinx);
+            killer.RpcMurderPlayer(killer);
+            killer.SetRealKiller(target);
+        }
+        return false;
     }
+    public override void ApplyGameOptions(IGameOptions opt, byte babushka) => opt.SetVision(HasImpostorVision.GetBool());
+
+    public override void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = KillCooldown.GetFloat();
+    public override bool CanUseKillButton(PlayerControl pc) => true;
+    public override bool CanUseImpostorVentButton(PlayerControl player) => CanVent.GetBool();
+
+    public override string GetProgressText(byte playerId, bool comms) 
+        => Utils.ColorString(CanJinx(playerId) ? Utils.GetRoleColor(CustomRoles.Gangster).ShadeColor(0.25f) : Color.gray, $"({AbilityLimit})");
+    
+    private bool CanJinx(byte id) => AbilityLimit > 0;
 }

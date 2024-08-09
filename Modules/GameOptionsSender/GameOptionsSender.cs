@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using AmongUs.GameOptions;
 using Hazel;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
@@ -10,13 +9,13 @@ namespace TOHE.Modules;
 public abstract class GameOptionsSender
 {
     #region Static
-    public readonly static List<GameOptionsSender> AllSenders = new(15) { new NormalGameOptionsSender() };
+    public readonly static List<GameOptionsSender> AllSenders = new(100) { new NormalGameOptionsSender() };
 
     public static void SendAllGameOptions()
     {
         AllSenders.RemoveAll(s => !s.AmValid()); // .AmValid() has a virtual property, so it doesn't always return true
-        var array = AllSenders.ToArray();
-        foreach (GameOptionsSender sender in array)
+        var AllSendersArray = AllSenders.ToArray();
+        foreach (GameOptionsSender sender in AllSendersArray)
         {
             if (sender.IsDirty) sender.SendGameOptions();
             sender.IsDirty = false;
@@ -31,16 +30,18 @@ public abstract class GameOptionsSender
     public virtual void SendGameOptions()
     {
         var opt = BuildGameOptions();
+        var currentGameMode = AprilFoolsMode.IsAprilFoolsModeToggledOn //April fools mode toggled on by host
+            ? opt.AprilFoolsOnMode : opt.GameMode; //Change game mode, same as well as in "RpcSyncSettings()"
 
         // option => byte[]
         MessageWriter writer = MessageWriter.Get(SendOption.None);
         writer.Write(opt.Version);
         writer.StartMessage(0);
-        writer.Write((byte)opt.GameMode);
-        if (opt.TryCast<NormalGameOptionsV07>(out var normalOpt))
-            NormalGameOptionsV07.Serialize(writer, normalOpt);
-        else if (opt.TryCast<HideNSeekGameOptionsV07>(out var hnsOpt))
-            HideNSeekGameOptionsV07.Serialize(writer, hnsOpt);
+        writer.Write((byte)currentGameMode);
+        if (opt.TryCast<NormalGameOptionsV08>(out var normalOpt))
+            NormalGameOptionsV08.Serialize(writer, normalOpt);
+        else if (opt.TryCast<HideNSeekGameOptionsV08>(out var hnsOpt))
+            HideNSeekGameOptionsV08.Serialize(writer, hnsOpt);
         else
         {
             writer.Recycle();
@@ -60,12 +61,14 @@ public abstract class GameOptionsSender
     {
         try
         {
-            for (byte i = 0; i < GameManager.Instance.LogicComponents.Count; i++)
+            byte logicOptionsIndex = 0;
+            foreach (var logicComponent in GameManager.Instance.LogicComponents.GetFastEnumerator())
             {
-                if (GameManager.Instance.LogicComponents[i].TryCast<LogicOptions>(out _))
+                if (logicComponent.TryCast<LogicOptions>(out _))
                 {
-                    SendOptionsArray(optionArray, i, -1);
+                    SendOptionsArray(optionArray, logicOptionsIndex, -1);
                 }
+                logicOptionsIndex++;
             }
         }
         catch (System.Exception error)

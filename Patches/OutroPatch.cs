@@ -1,14 +1,16 @@
-using HarmonyLib;
+using Hazel;
+using TMPro;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using TOHE.Modules;
 using TOHE.Modules.ChatManager;
+using TOHE.Roles.Core.AssignManager;
 using TOHE.Roles.Impostor;
 using TOHE.Roles.Neutral;
 using UnityEngine;
 using static TOHE.Translator;
+using TOHE.Roles.Crewmate;
+using TOHE.Roles.Core;
 
 namespace TOHE;
 
@@ -21,48 +23,85 @@ class EndGamePatch
     {
         GameStates.InGame = false;
 
+        // if game is H&S or Host no have mod
+        if (!GameStates.IsModHost || GameStates.IsHideNSeek) return;
+
         Logger.Info("-----------Game over-----------", "Phase");
-        if (!GameStates.IsModHost) return;
-        if (GameStates.IsHideNSeek) return;
-        SummaryText = [];
-        foreach (var id in Main.PlayerStates.Keys.ToArray())
+
+        try
         {
-            if (Doppelganger.IsEnable)
+            if (AmongUsClient.Instance.AmHost)
             {
-                if (Doppelganger.DoppelVictim.ContainsKey(id))
+                foreach (var pvc in GhostRoleAssign.GhostGetPreviousRole.Keys) // Sets role back to original so it shows up in /l results.
                 {
-                    var dpc = Utils.GetPlayerById(id);
-                    if (dpc != null) 
-                    {
-                        //if (id == PlayerControl.LocalPlayer.PlayerId) Main.nickName = Doppelganger.DoppelVictim[id];
-                        //else
-                        //{ 
-                        dpc.RpcSetName(Doppelganger.DoppelVictim[id]);
-                        //}
-                        Main.AllPlayerNames[id] = Doppelganger.DoppelVictim[id];
-                    }
+                    if (!Main.PlayerStates.TryGetValue(pvc, out var state) || !state.MainRole.IsGhostRole()) continue;
+                    if (!GhostRoleAssign.GhostGetPreviousRole.TryGetValue(pvc, out CustomRoles prevrole)) continue;
+
+                    Main.PlayerStates[pvc].MainRole = prevrole;
+
+                    MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SyncPlayerSetting, SendOption.Reliable, -1);
+                    writer.Write(pvc);
+                    writer.WritePacked((int)prevrole);
+                    AmongUsClient.Instance.FinishRpcImmediately(writer);
                 }
+
+                if (GhostRoleAssign.GhostGetPreviousRole.Any()) Logger.Info(string.Join(", ", GhostRoleAssign.GhostGetPreviousRole.Select(x => $"{Utils.GetPlayerById(x.Key).GetRealName()}/{x.Value}")), "OutroPatch.GhostGetPreviousRole");
             }
-            if (Main.EnableRoleSummary.Value)
-            {
-                SummaryText[id] = Utils.SummaryTexts(id, disableColor: false);
-            }
-            if (!Main.EnableRoleSummary.Value)
-            {
-                SummaryText[id] = Utils.NewSummaryTexts(id, disableColor: false);
-            }
+
+        }
+        catch (Exception e)
+        {
+            Logger.Error($"{e} at EndGamePatch", "GhostGetPreviousRole");
         }
 
-        var sb = new StringBuilder(GetString("KillLog") + ":");
-        foreach (var kvp in Main.PlayerStates.OrderBy(x => x.Value.RealKiller.Item1.Ticks))
+        SummaryText = [];
+
+        GhostRoleAssign.GhostGetPreviousRole = [];
+
+        foreach (var id in Main.PlayerStates.Keys.ToArray())
         {
-            var date = kvp.Value.RealKiller.Item1;
-            if (date == DateTime.MinValue) continue;
-            var killerId = kvp.Value.GetRealKiller();
-            var targetId = kvp.Key;
-            sb.Append($"\n{date:T} {Main.AllPlayerNames[targetId]}({(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetDisplayRoleName(targetId, true))}{(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetSubRolesText(targetId, summary: true))}) [{Utils.GetVitalText(kvp.Key)}]");
-            if (killerId != byte.MaxValue && killerId != targetId)
-                sb.Append($"\n\t⇐ {Main.AllPlayerNames[killerId]}({(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetDisplayRoleName(killerId, true))}{(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetSubRolesText(killerId, summary: true))})");
+            if (Doppelganger.HasEnabled && Doppelganger.DoppelVictim.TryGetValue(id, out var playerName))
+            {
+                var dpc = Utils.GetPlayerById(id);
+                if (dpc != null)
+                {
+                    dpc.RpcSetName(playerName);
+                    Main.AllPlayerNames[id] = playerName;
+                }
+            }
+
+            SummaryText[id] = Utils.SummaryTexts(id, disableColor: false);
+        }
+
+        CustomRoleManager.RoleClass.Values.Where(x => x.IsEnable).Do(x => x.IsEnable = false);
+
+        var sb = new StringBuilder(GetString("KillLog") + ":");
+        if (Options.OldKillLog.GetBool())
+            foreach (var kvp in Main.PlayerStates.OrderBy(x => x.Value.RealKiller.Item1.Ticks))
+            {
+                var date = kvp.Value.RealKiller.Item1;
+                if (date == DateTime.MinValue) continue;
+                var killerId = kvp.Value.GetRealKiller();
+                var targetId = kvp.Key;
+                sb.Append($"\n{date:T} {Main.AllPlayerNames[targetId]}({(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetDisplayRoleAndSubName(targetId, targetId, true))}{(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetSubRolesText(targetId, summary: true))}) [{Utils.GetVitalText(kvp.Key)}]");
+                if (killerId != byte.MaxValue && killerId != targetId)
+                    sb.Append($"\n\t⇐ {Main.AllPlayerNames[killerId]}({(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetDisplayRoleAndSubName(killerId, killerId, true))}{(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetSubRolesText(killerId, summary: true))})");
+            }
+        else
+        {
+            sb.Clear();
+            foreach (var kvp in Main.PlayerStates.OrderBy(x => x.Value.RealKiller.Item1.Ticks))
+            {
+                var date = kvp.Value.RealKiller.Item1;
+                if (date == DateTime.MinValue) continue;
+                var killerId = kvp.Value.GetRealKiller();
+                var targetId = kvp.Key;
+
+                sb.Append($"\n<line-height=85%><size=85%><voffset=-1em><color=#9c9c9c>{date:T}</color> {Main.AllPlayerNames[targetId]}({(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetDisplayRoleAndSubName(targetId, targetId, true))}{(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetSubRolesText(targetId, summary: true))}) 『{Utils.GetVitalText(kvp.Key, true)}』</voffset></size></line-height>");
+                if (killerId != byte.MaxValue && killerId != targetId)
+                    sb.Append($"<br>\t⇐ {Main.AllPlayerNames[killerId]}({(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetDisplayRoleAndSubName(killerId, killerId, true))}{(Options.CurrentGameMode == CustomGameMode.FFA ? string.Empty : Utils.GetSubRolesText(killerId, summary: true))})");
+            }
+            
         }
         KillLog = sb.ToString();
         if (!KillLog.Contains('\n')) KillLog = "";
@@ -71,7 +110,7 @@ class EndGamePatch
             Main.NormalOptions.KillCooldown = Options.DefaultKillCooldown;
         
         //winnerListリセット
-        TempData.winners = new Il2CppSystem.Collections.Generic.List<WinningPlayerData>();
+        EndGameResult.CachedWinners = new Il2CppSystem.Collections.Generic.List<CachedPlayerData>();
         var winner = new List<PlayerControl>();
         foreach (var pc in Main.AllPlayerControls)
         {
@@ -82,22 +121,27 @@ class EndGamePatch
             winner.AddRange(Main.AllPlayerControls.Where(p => p.Is(team) && !winner.Contains(p)));
         }
 
-        Main.winnerNameList = [];
-        Main.winnerList = [];
+        Main.winnerNameList.Clear();
+        Main.winnerList.Clear();
+
+        // Remove duplicates
+        winner = winner.Distinct().ToList();
+
         foreach (var pc in winner.ToArray())
         {
             if (CustomWinnerHolder.WinnerTeam is not CustomWinner.Draw && pc.Is(CustomRoles.GM)) continue;
+            // Check "Contains" to avoid adding players twice
+            if (Main.winnerList.Contains(pc.PlayerId)) continue;
 
-            TempData.winners.Add(new WinningPlayerData(pc.Data));
+            EndGameResult.CachedWinners.Add(new CachedPlayerData(pc.Data));
             Main.winnerList.Add(pc.PlayerId);
             Main.winnerNameList.Add(pc.GetRealName());
         }
 
-        BountyHunter.ChangeTimer = [];
-        Main.isDoused = [];
-        Main.isDraw = [];
-        Main.isRevealed = [];
-        Main.PlayerQuitTimes = [];
+        BountyHunter.ChangeTimer.Clear();
+        Revolutionist.IsDraw.Clear();
+        Overseer.IsRevealed.Clear();
+        Main.PlayerQuitTimes.Clear();
         ChatManager.ChatSentBySystem = [];
 
         Main.VisibleTasksCount = false;
@@ -121,28 +165,16 @@ class SetEverythingUpPatch
         if (GameStates.IsHideNSeek) return;
         if (!Main.playerVersion.ContainsKey(AmongUsClient.Instance.HostId)) return;
         //#######################################
-        //          ==勝利陣営表示==
+        //      ==Victory faction display==
         //#######################################
-        if (Main.EnableRoleSummary.Value)
-        {        
-        __instance.WinText.alignment = TMPro.TextAlignmentOptions.Right;
-        }
-        if (!Main.EnableRoleSummary.Value)
-        {        
-        __instance.WinText.alignment = TMPro.TextAlignmentOptions.Center;
-        }
+
+        __instance.WinText.alignment = TextAlignmentOptions.Right;
+
         var WinnerTextObject = UnityEngine.Object.Instantiate(__instance.WinText.gameObject);
         WinnerTextObject.transform.localScale = new(0.6f, 0.6f, 0.6f);
+        WinnerTextObject.transform.position = new(__instance.WinText.transform.position.x + 2.4f, __instance.WinText.transform.position.y - 0.5f, __instance.WinText.transform.position.z);
 
-        if (Main.EnableRoleSummary.Value)
-        {
-            WinnerTextObject.transform.position = new(__instance.WinText.transform.position.x + 2.4f, __instance.WinText.transform.position.y - 0.5f, __instance.WinText.transform.position.z);
-        }
-        if (!Main.EnableRoleSummary.Value)
-        {
-            WinnerTextObject.transform.position = new(__instance.WinText.transform.position.x, __instance.WinText.transform.position.y - 0.5f, __instance.WinText.transform.position.z);
-        }
-        var WinnerText = WinnerTextObject.GetComponent<TMPro.TextMeshPro>(); //WinTextと同じ型のコンポーネントを取得
+        var WinnerText = WinnerTextObject.GetComponent<TextMeshPro>(); //Get components of the same type as WinText
         WinnerText.fontSizeMin = 3f;
         WinnerText.text = "";
 
@@ -187,10 +219,6 @@ class SetEverythingUpPatch
             case CustomWinner.Impostor:
                 CustomWinnerColor = Utils.GetRoleColorCode(CustomRoles.Impostor);
                 __instance.BackgroundBar.material.color = Utils.GetRoleColor(CustomRoles.Impostor);
-                break;
-            case CustomWinner.Rogue:
-                CustomWinnerColor = Utils.GetRoleColorCode(CustomRoles.Rogue);
-                __instance.BackgroundBar.material.color = Utils.GetRoleColor(CustomRoles.Rogue);
                 break;
             case CustomWinner.Egoist:
                 CustomWinnerColor = Utils.GetRoleColorCode(CustomRoles.Egoist);
@@ -267,64 +295,67 @@ class SetEverythingUpPatch
 
     EndOfText:
 
-        LastWinsText = WinnerText.text.RemoveHtmlTags();
+        LastWinsText = WinnerText.text/*.RemoveHtmlTags()*/;
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        //#######################################
-        //           ==最終結果表示==
-        //#######################################
+        //########################################
+        //     ==The final result indicates==
+        //########################################
 
         var Pos = Camera.main.ViewportToWorldPoint(new Vector3(0f, 1f, Camera.main.nearClipPlane));
         var RoleSummaryObject = UnityEngine.Object.Instantiate(__instance.WinText.gameObject);
         RoleSummaryObject.transform.position = new Vector3(__instance.Navigation.ExitButton.transform.position.x + 0.1f, Pos.y - 0.1f, -15f);
         RoleSummaryObject.transform.localScale = new Vector3(1f, 1f, 1f);
 
-        StringBuilder sb = new($"{GetString("RoleSummaryText")}");
+        StringBuilder sb = new($"{GetString("RoleSummaryText")}\n<b>");
         List<byte> cloneRoles = new(Main.PlayerStates.Keys);
-        foreach (var id in Main.winnerList.ToArray())
+        foreach (byte id in Main.winnerList.ToArray())
         {
             if (EndGamePatch.SummaryText[id].Contains("<INVALID:NotAssigned>")) continue;
-            sb.Append($"\n<color={CustomWinnerColor}>★</color> ").Append(EndGamePatch.SummaryText[id]);
+            sb.Append('\n').Append(EndGamePatch.SummaryText[id]);
             cloneRoles.Remove(id);
         }
-        if (Options.CurrentGameMode == CustomGameMode.FFA)
+        switch (Options.CurrentGameMode)
         {
-            List<(int, byte)> list = [];
-            foreach (byte id in cloneRoles.ToArray())
-            {
-                list.Add((FFAManager.GetRankOfScore(id), id));
-            }
+            case CustomGameMode.FFA:
+                {
+                    List<(int, byte)> listFFA = [];
+                    foreach (byte id in cloneRoles.ToArray())
+                    {
+                        listFFA.Add((FFAManager.GetRankOfScore(id), id));
+                    }
 
-            list.Sort();
-            foreach (var id in list.Where(x => EndGamePatch.SummaryText.ContainsKey(x.Item2)))
-                sb.Append($"\n　 ").Append(EndGamePatch.SummaryText[id.Item2]);
+                    listFFA.Sort();
+                    foreach (var id in listFFA.Where(x => EndGamePatch.SummaryText.ContainsKey(x.Item2)))
+                        sb.Append($"\n　 ").Append(EndGamePatch.SummaryText[id.Item2]);
+                    break;
+                }
+            default: // Normal game
+                {
+                    sb.Append($"</b>\n");
+                    foreach (byte id in cloneRoles.ToArray())
+                    {
+                        if (EndGamePatch.SummaryText[id].Contains("<INVALID:NotAssigned>")) continue;
+                        sb.Append('\n').Append(EndGamePatch.SummaryText[id]);
+                    }
+
+                    break;
+                }
         }
-        else
-        { 
-            foreach (var id in cloneRoles.ToArray())
-            {
-                if (EndGamePatch.SummaryText[id].Contains("<INVALID:NotAssigned>")) continue;
-                sb.Append($"\n　 ").Append(EndGamePatch.SummaryText[id]);
-            }
-        }
-        var RoleSummary = RoleSummaryObject.GetComponent<TMPro.TextMeshPro>();
-        {
-            RoleSummary.alignment = TMPro.TextAlignmentOptions.TopLeft;
-            RoleSummary.color = Color.white;
-            RoleSummary.outlineWidth *= 1.2f;
-            if (Main.EnableRoleSummary.Value)
-            {
-                RoleSummary.fontSizeMin = RoleSummary.fontSizeMax = RoleSummary.fontSize = 1.25f;
-            }
-            if (!Main.EnableRoleSummary.Value)
-            {
-                RoleSummary.fontSizeMin = RoleSummary.fontSizeMax = RoleSummary.fontSize = 1.25f;
-            }
-        }
+        var RoleSummary = RoleSummaryObject.GetComponent<TextMeshPro>();
+        RoleSummary.alignment = TextAlignmentOptions.TopLeft;
+        RoleSummary.color = Color.white;
+        RoleSummary.outlineWidth *= 1.2f;
+        RoleSummary.fontSizeMin = RoleSummary.fontSizeMax = RoleSummary.fontSize = 1.25f;
+
         var RoleSummaryRectTransform = RoleSummary.GetComponent<RectTransform>();
         RoleSummaryRectTransform.anchoredPosition = new Vector2(Pos.x + 3.5f, Pos.y - 0.1f);
         RoleSummary.text = sb.ToString();
+
+        Logger.Info($"{CustomWinnerHolder.WinnerTeam}", "Winner Team");
+        Logger.Info($"{LastWinsReason}", "Wins Reason");
+        Logger.Info($"{RoleSummary.text.RemoveHtmlTags()}", "Role Summary");
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -1,5 +1,3 @@
-using HarmonyLib;
-
 namespace TOHE;
 
 //参考元:https://github.com/yukieiji/ExtremeRoles/blob/master/ExtremeRoles/Patches/AirshipStatusPatch.cs
@@ -8,6 +6,12 @@ public static class AirshipStatusPrespawnStepPatch
 {
     public static bool Prefix()
     {
-        return !PlayerControl.LocalPlayer.Is(CustomRoles.GM); // GMは湧き画面をスキップ
+        if (PlayerControl.LocalPlayer.Is(CustomRoles.GM))
+        {
+            RandomSpawn.AirshipSpawn(PlayerControl.LocalPlayer);
+            // GM skips gushing screen
+            return false;
+        }
+        return true;
     }
 }

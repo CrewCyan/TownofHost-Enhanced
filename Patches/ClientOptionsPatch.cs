@@ -1,4 +1,3 @@
-using HarmonyLib;
 using UnityEngine;
 
 namespace TOHE;
@@ -9,18 +8,19 @@ public static class OptionsMenuBehaviourStartPatch
 {
     private static ClientOptionItem UnlockFPS;
     private static ClientOptionItem ShowFPS;
-    private static ClientOptionItem AutoMuteUs;
-    private static ClientOptionItem HorseMode;
     private static ClientOptionItem EnableGM;
     private static ClientOptionItem AutoStart;
+    private static ClientOptionItem DarkTheme;
+    private static ClientOptionItem DisableLobbyMusic;
+    private static ClientOptionItem ShowTextOverlay;
+    private static ClientOptionItem HorseMode;
     private static ClientOptionItem ForceOwnLanguage;
     private static ClientOptionItem ForceOwnLanguageRoleName;
     private static ClientOptionItem EnableCustomButton;
     private static ClientOptionItem EnableCustomSoundEffect;
-    private static ClientOptionItem ShowTextOverlay;
-    private static ClientOptionItem ModeForSmallScreen;
-    private static ClientOptionItem EnableRoleSummary;
+    private static ClientOptionItem EnableCustomDecorations;
     private static ClientOptionItem SwitchVanilla;
+
 #if DEBUG
     private static ClientOptionItem VersionCheat;
     private static ClientOptionItem GodMode;
@@ -53,14 +53,6 @@ public static class OptionsMenuBehaviourStartPatch
         {
             ShowFPS = ClientOptionItem.Create("ShowFPS", Main.ShowFPS, __instance);
         }
-        if (AutoMuteUs == null || AutoMuteUs.ToggleButton == null)
-        {
-            AutoMuteUs = ClientOptionItem.Create("AutoMuteUs", Main.AutoMuteUs, __instance);
-        }
-        if (HorseMode == null || HorseMode.ToggleButton == null)
-        {
-            HorseMode = ClientOptionItem.Create("HorseMode", Main.HorseMode, __instance);
-        }
         if (EnableGM == null || EnableGM.ToggleButton == null)
         {
             EnableGM = ClientOptionItem.Create("GM", Main.EnableGM, __instance);
@@ -74,6 +66,34 @@ public static class OptionsMenuBehaviourStartPatch
                 {
                     GameStartManager.Instance.ResetStartState();
                     Logger.SendInGame(Translator.GetString("CancelStartCountDown"));
+                }
+            }
+        }
+        if (DarkTheme == null || DarkTheme.ToggleButton == null)
+        {
+            DarkTheme = ClientOptionItem.Create("DarkTheme", Main.DarkTheme, __instance);
+        }
+        if (DisableLobbyMusic == null || DisableLobbyMusic.ToggleButton == null)
+        {
+            DisableLobbyMusic = ClientOptionItem.Create("DisableLobbyMusic", Main.DisableLobbyMusic, __instance);
+        }
+        if (ShowTextOverlay == null || ShowTextOverlay.ToggleButton == null)
+        {
+            ShowTextOverlay = ClientOptionItem.Create("ShowTextOverlay", Main.ShowTextOverlay, __instance);
+        }
+        if (HorseMode == null || HorseMode.ToggleButton == null)
+        {
+            HorseMode = ClientOptionItem.Create("HorseMode", Main.HorseMode, __instance, SwitchHorseMode);
+            static void SwitchHorseMode()
+            {
+                HorseMode.UpdateToggle();
+                foreach (var pc in PlayerControl.AllPlayerControls)
+                {
+                    pc.MyPhysics.SetBodyType(pc.BodyType);
+                    if (pc.BodyType == PlayerBodyTypes.Normal)
+                    {
+                        pc.cosmetics.currentBodySprite.BodySprite.transform.localScale = new(0.5f, 0.5f, 1f);
+                    }
                 }
             }
         }
@@ -93,17 +113,9 @@ public static class OptionsMenuBehaviourStartPatch
         {
             EnableCustomSoundEffect = ClientOptionItem.Create("EnableCustomSoundEffect", Main.EnableCustomSoundEffect, __instance);
         }
-        if (ShowTextOverlay == null || ShowTextOverlay.ToggleButton == null)
+        if (EnableCustomDecorations == null || EnableCustomDecorations.ToggleButton == null)
         {
-            ShowTextOverlay = ClientOptionItem.Create("ShowTextOverlay", Main.ShowTextOverlay, __instance);
-        }
-        if (ModeForSmallScreen == null || ModeForSmallScreen.ToggleButton == null)
-        {
-            ModeForSmallScreen = ClientOptionItem.Create("ModeForSmallScreen", Main.ModeForSmallScreen, __instance);
-        }
-        if (EnableRoleSummary == null || EnableRoleSummary.ToggleButton == null)
-        {
-            EnableRoleSummary = ClientOptionItem.Create("EnableRoleSummary", Main.EnableRoleSummary, __instance);
+            EnableCustomDecorations = ClientOptionItem.Create("EnableCustomDecorations", Main.EnableCustomDecorations, __instance);
         }
         if (SwitchVanilla == null || SwitchVanilla.ToggleButton == null)
         {
@@ -114,6 +126,7 @@ public static class OptionsMenuBehaviourStartPatch
                 Main.Instance.Unload();
             }
         }
+
 #if DEBUG
         if (EOSManager.Instance.friendCode.GetDevUser().DeBug)
         {

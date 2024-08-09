@@ -1,20 +1,22 @@
 ﻿using AmongUs.GameOptions;
-using HarmonyLib;
 using Hazel;
-using System.Collections.Generic;
-using System.Linq;
+using InnerNet;
 using System.Text;
-using TOHE.Roles.Crewmate;
+using TOHE.Roles.Core;
+using UnityEngine;
 using static TOHE.Options;
 using static TOHE.Translator;
 
 namespace TOHE.Roles.Neutral;
 
-public static class Wraith
+internal class Wraith : RoleBase
 {
-    private static readonly int Id = 18500;
-    private static List<byte> playerIdList = [];
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 18500;
+    public static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Wraith);
+    public override CustomRoles ThisRoleBase => CustomRoles.Impostor;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.NeutralKilling;
+    //==================================================================\\
 
     private static OptionItem WraithCooldown;
     private static OptionItem WraithDuration;
@@ -22,10 +24,12 @@ public static class Wraith
     private static OptionItem HasImpostorVision;
 
     private static Dictionary<byte, long> InvisTime = [];
-    private static Dictionary<byte, long> lastTime = [];
-    private static Dictionary<byte, int> ventedId = [];
+    private static readonly Dictionary<byte, long> lastTime = [];
+    private static readonly Dictionary<byte, int> ventedId = [];
 
-    public static void SetupCustomOption()
+    private static long lastFixedTime = 0;
+
+    public override void SetupCustomOption()
     {
         SetupSingleRoleOptions(Id, TabGroup.NeutralRoles, CustomRoles.Wraith, 1, zeroOne: false);        
         WraithCooldown = FloatOptionItem.Create(Id + 2, "WraithCooldown", new(1f, 180f, 1f), 30f, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Wraith])
@@ -33,76 +37,74 @@ public static class Wraith
         WraithDuration = FloatOptionItem.Create(Id + 4, "WraithDuration", new(1f, 60f, 1f), 15f, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Wraith])
             .SetValueFormat(OptionFormat.Seconds);
         WraithVentNormallyOnCooldown = BooleanOptionItem.Create(Id + 5, "WraithVentNormallyOnCooldown", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Wraith]);
-        HasImpostorVision = BooleanOptionItem.Create(Id + 6, "ImpostorVision", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Wraith]);
+        HasImpostorVision = BooleanOptionItem.Create(Id + 6, GeneralOption.ImpostorVision, true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Wraith]);
     }
-    public static void Init()
+    public override void Init()
     {
-        playerIdList = [];
-        InvisTime = [];
-        lastTime = [];
-        ventedId = [];
-        IsEnable = false;
+        InvisTime.Clear();
+        lastTime.Clear();
+        ventedId.Clear();
     }
-    public static void Add(byte playerId)
+    public override void Add(byte playerId)
     {
-        playerIdList.Add(playerId);
-        IsEnable = true;
-
-        if (!AmongUsClient.Instance.AmHost) return;
         if (!Main.ResetCamPlayerList.Contains(playerId))
             Main.ResetCamPlayerList.Add(playerId);
-
     }
-    private static void SendRPC(PlayerControl pc)
+    private void SendRPC(PlayerControl pc)
     {
         if (pc.AmOwner) return;
-        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SetWraithTimer, SendOption.Reliable, pc.GetClientId());
+        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SyncRoleSkill, SendOption.Reliable, pc.GetClientId());
+        writer.WriteNetObject(_Player);//SetWraithTimer
         writer.Write((InvisTime.TryGetValue(pc.PlayerId, out var x) ? x : -1).ToString());
         writer.Write((lastTime.TryGetValue(pc.PlayerId, out var y) ? y : -1).ToString());
         AmongUsClient.Instance.FinishRpcImmediately(writer);
     }
-    public static void ReceiveRPC(MessageReader reader)
+    public override void ReceiveRPC(MessageReader reader, PlayerControl NaN)
     {
-        InvisTime = [];
-        lastTime = [];
+        InvisTime.Clear();
+        lastTime.Clear();
         long invis = long.Parse(reader.ReadString());
         long last = long.Parse(reader.ReadString());
         if (invis > 0) InvisTime.Add(PlayerControl.LocalPlayer.PlayerId, invis);
         if (last > 0) lastTime.Add(PlayerControl.LocalPlayer.PlayerId, last);
     }
-    public static bool CanGoInvis(byte id)
+    private static bool CanGoInvis(byte id)
         => GameStates.IsInTask && !InvisTime.ContainsKey(id) && !lastTime.ContainsKey(id);
-    public static bool IsInvis(byte id) => InvisTime.ContainsKey(id);
+    private static bool IsInvis(byte id) => InvisTime.ContainsKey(id);
 
-    private static long lastFixedTime = 0;
-    public static void OnReportDeadBody()
+    public override void OnReportDeadBody(PlayerControl pa, NetworkedPlayerInfo dum)
     {
-        lastTime = [];
-        InvisTime = [];
-
-        foreach (var wraithId in playerIdList.ToArray())
+        foreach (var wraithId in _playerIdList.ToArray())
         {
-            if (!ventedId.ContainsKey(wraithId)) continue;
+            if (!IsInvis(wraithId)) continue;
             var wraith = Utils.GetPlayerById(wraithId);
-            if (wraith == null) return;
+            if (wraith == null) continue;
 
             wraith?.MyPhysics?.RpcBootFromVent(ventedId.TryGetValue(wraithId, out var id) ? id : Main.LastEnteredVent[wraithId].Id);
+            InvisTime.Remove(wraithId);
+            ventedId.Remove(wraithId);
             SendRPC(wraith);
         }
 
-        ventedId = [];
+        lastTime.Clear();
+        InvisTime.Clear();
+        ventedId.Clear();
     }
-    public static void AfterMeetingTasks()
+    public override void AfterMeetingTasks()
     {
-        lastTime = [];
-        InvisTime = [];
-        foreach (var pc in Main.AllAlivePlayerControls.Where(x => playerIdList.Contains(x.PlayerId)).ToArray())
+        lastTime.Clear();
+        InvisTime.Clear();
+
+        foreach (var wraithId in _playerIdList)
         {
-            lastTime.Add(pc.PlayerId, Utils.GetTimeStamp());
-            SendRPC(pc);
+            var wraith = Utils.GetPlayerById(wraithId);
+            if (!wraith.IsAlive()) continue;
+
+            lastTime.Add(wraith.PlayerId, Utils.GetTimeStamp());
+            SendRPC(wraith);
         }
     }
-    public static void OnFixedUpdate(PlayerControl player)
+    public override void OnFixedUpdateLowLoad(PlayerControl player)
     {
         var now = Utils.GetTimeStamp();
 
@@ -123,12 +125,12 @@ public static class Wraith
                 var pc = Utils.GetPlayerById(it.Key);
                 if (pc == null) continue;
                 var remainTime = it.Value + (long)WraithDuration.GetFloat() - now;
-                if (remainTime < 0)
+                if (remainTime < 0 || !pc.IsAlive())
                 {
                     lastTime.Add(pc.PlayerId, now);
                     pc?.MyPhysics?.RpcBootFromVent(ventedId.TryGetValue(pc.PlayerId, out var id) ? id : Main.LastEnteredVent[pc.PlayerId].Id);
                     ventedId.Remove(pc.PlayerId);
-                    NameNotifyManager.Notify(pc, GetString("WraithInvisStateOut"));
+                    pc.Notify(GetString("WraithInvisStateOut"));
                     SendRPC(pc);
                     continue;
                 }
@@ -143,7 +145,7 @@ public static class Wraith
             refreshList.Do(x => SendRPC(Utils.GetPlayerById(x)));
         }
     }
-    public static void OnCoEnterVent(PlayerPhysics __instance, int ventId)
+    public override void OnCoEnterVent(PlayerPhysics __instance, int ventId)
     {
         var pc = __instance.myPlayer;
         if (!AmongUsClient.Instance.AmHost || IsInvis(pc.PlayerId)) return;
@@ -154,38 +156,37 @@ public static class Wraith
                 ventedId.Remove(pc.PlayerId);
                 ventedId.Add(pc.PlayerId, ventId);
 
-                MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(__instance.NetId, (byte)RpcCalls.BootFromVent, SendOption.Reliable, pc.GetClientId());
-                writer.WritePacked(ventId);
-                AmongUsClient.Instance.FinishRpcImmediately(writer);
+                __instance.RpcBootFromVentDesync(ventId, pc);
 
                 InvisTime.Add(pc.PlayerId, Utils.GetTimeStamp());
                 SendRPC(pc);
-                NameNotifyManager.Notify(pc, GetString("WraithInvisState"), WraithDuration.GetFloat());
+                pc.Notify(GetString("WraithInvisState"), WraithDuration.GetFloat());
             }
             else
             {
                 if (!WraithVentNormallyOnCooldown.GetBool())
                 {
                     __instance.myPlayer.MyPhysics.RpcBootFromVent(ventId);
-                    NameNotifyManager.Notify(pc, GetString("WraithInvisInCooldown"));
+                    pc.Notify(GetString("WraithInvisInCooldown"));
                 }
             }
-        }, 0.5f, "Wraith Vent");
+        }, 0.8f, "Wraith Vent");
     }
-    public static void ApplyGameOptions(IGameOptions opt) => opt.SetVision(HasImpostorVision.GetBool());
-    public static void OnEnterVent(PlayerControl pc, Vent vent)
+    public override void ApplyGameOptions(IGameOptions opt, byte id) => opt.SetVision(HasImpostorVision.GetBool());
+    public override bool CanUseKillButton(PlayerControl pc) => pc.IsAlive();
+    public override bool CanUseImpostorVentButton(PlayerControl pc) => true;
+    public override void OnEnterVent(PlayerControl pc, Vent vent)
     {
-        if (!IsEnable) return;
-        if (!pc.Is(CustomRoles.Wraith) || !IsInvis(pc.PlayerId)) return;
+        if (!IsInvis(pc.PlayerId)) return;
 
         InvisTime.Remove(pc.PlayerId);
         lastTime.Add(pc.PlayerId, Utils.GetTimeStamp());
         SendRPC(pc);
 
         pc?.MyPhysics?.RpcBootFromVent(vent.Id);
-        NameNotifyManager.Notify(pc, GetString("WraithInvisStateOut"));
+        pc.Notify(GetString("WraithInvisStateOut"));
     }
-    public static string GetHudText(PlayerControl pc)
+    public override string GetLowerText(PlayerControl pc, PlayerControl seen = null, bool isForMeeting = false, bool isForHud = false)
     {
         if (pc == null || !GameStates.IsInTask || !PlayerControl.LocalPlayer.IsAlive()) return "";
         var str = new StringBuilder();
@@ -206,17 +207,21 @@ public static class Wraith
         return str.ToString();
     }
 
-    public static bool OnCheckMurder(PlayerControl killer, PlayerControl target)
+    public override void SetAbilityButtonText(HudManager hud, byte playerId)
     {
-        if (Medic.ProtectList.Contains(target.PlayerId)) return true;
-        if (target.Is(CustomRoles.Bait)) return true;
-        if (target.Is(CustomRoles.Pestilence)) return true;
-        if (target.Is(CustomRoles.Veteran) && Main.VeteranInProtect.ContainsKey(target.PlayerId)) return true;
-
+        hud.KillButton.OverrideText(GetString("KillButtonText"));
+        hud.ImpostorVentButton.OverrideText(GetString(IsInvis(PlayerControl.LocalPlayer.PlayerId) ? "WraithRevertVentButtonText" : "WraithVentButtonText"));
+    }
+    public override bool OnCheckMurderAsKiller(PlayerControl killer, PlayerControl target)
+    {
         if (!IsInvis(killer.PlayerId)) return true;
+
+        killer.RpcGuardAndKill(target);
         killer.SetKillCooldown();
-        target.RpcCheckAndMurder(target);
+
+        target.RpcMurderPlayer(target);
         target.SetRealKiller(killer);
         return false;
     }
+    public override Sprite ImpostorVentButtonSprite(PlayerControl player) => CustomButton.Get("invisible");
 }

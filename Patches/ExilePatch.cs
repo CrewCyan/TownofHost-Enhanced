@@ -1,16 +1,13 @@
-using AmongUs.Data;
-using HarmonyLib;
-using System.Linq;
-using TOHE.Roles.Crewmate;
-using TOHE.Roles.Double;
-using TOHE.Roles.Impostor;
+﻿using AmongUs.Data;
+using System;
+using TOHE.Roles.Core;
 using TOHE.Roles.Neutral;
 
 namespace TOHE;
 
 class ExileControllerWrapUpPatch
 {
-    public static GameData.PlayerInfo AntiBlackout_LastExiled;
+    public static NetworkedPlayerInfo AntiBlackout_LastExiled;
     [HarmonyPatch(typeof(ExileController), nameof(ExileController.WrapUp))]
     class BaseExileControllerPatch
     {
@@ -19,6 +16,10 @@ class ExileControllerWrapUpPatch
             try
             {
                 WrapUpPostfix(__instance.exiled);
+            }
+            catch (Exception error)
+            {
+                Utils.ThrowException(error);
             }
             finally
             {
@@ -36,26 +37,40 @@ class ExileControllerWrapUpPatch
             {
                 WrapUpPostfix(__instance.exiled);
             }
+            catch (Exception error)
+            {
+                Logger.Error($"Error after exiled: {error}", "WrapUpAndSpawn");
+            }
             finally
             {
                 WrapUpFinalizer(__instance.exiled);
             }
         }
     }
-    static void WrapUpPostfix(GameData.PlayerInfo exiled)
+    static void WrapUpPostfix(NetworkedPlayerInfo exiled)
     {
         if (AntiBlackout.BlackOutIsActive) exiled = AntiBlackout_LastExiled;
+
+        // Still not springing up in airships
+        if (!GameStates.AirshipIsActive)
+        {
+            foreach (var state in Main.PlayerStates.Values)
+            {
+                state.HasSpawned = true;
+            }
+        }
 
         bool DecidedWinner = false;
         if (!AmongUsClient.Instance.AmHost) return;
         AntiBlackout.RestoreIsDead(doSend: false);
-        
-        Pixie.CheckExileTarget(exiled);
 
-        Logger.Info($"{!Collector.CollectorWin(false)}", "!Collector.CollectorWin(false)");
+        List<Collector> collectorCL = Utils.GetRoleBasesByType<Collector>()?.ToList();
+
+        if (collectorCL != null) Logger.Info($"{!collectorCL.Any(x => x.CollectorWin(false))}", "!Collector.CollectorWin(false)");
         Logger.Info($"{exiled != null}", "exiled != null");
+        bool CLThingy = collectorCL == null || !collectorCL.Any(x => x.CollectorWin(false));
 
-        if (!Collector.CollectorWin(false) && exiled != null)
+        if (CLThingy && exiled != null)
         {
             // Reset player cam for exiled desync impostor
             if (Main.ResetCamPlayerList.Contains(exiled.PlayerId))
@@ -64,168 +79,29 @@ class ExileControllerWrapUpPatch
             }
 
             exiled.IsDead = true;
-            Main.PlayerStates[exiled.PlayerId].deathReason = PlayerState.DeathReason.Vote;
+            exiled.PlayerId.SetDeathReason(PlayerState.DeathReason.Vote);
 
-            var role = exiled.GetCustomRole();
+            var exiledPC = Utils.GetPlayerById(exiled.PlayerId);
+            var exiledRoleClass = exiledPC.GetRoleClass();
+           
+            var emptyString = string.Empty;
 
-            if (Quizmaster.IsEnable)
-                Quizmaster.OnPlayerExile(exiled);
+            exiledRoleClass?.CheckExile(exiled, ref DecidedWinner, isMeetingHud: false, name: ref emptyString);
 
-            var pcArray = Main.AllPlayerControls.Where(x => x.Is(CustomRoles.Innocent) && !x.IsAlive() && x.GetRealKiller()?.PlayerId == exiled.PlayerId).ToArray();
-            if (pcArray.Length > 0)
-            {
-                if (!Options.InnocentCanWinByImp.GetBool() && role.IsImpostor())
-                {
-                    Logger.Info("Exeiled Winner Check for impostor", "Innocent");
-                }
-                else
-                {
-                    bool isInnocentWinConverted = false;
-                    foreach (var Innocent in pcArray)
-                    {
-                        if (CustomWinnerHolder.CheckForConvertedWinner(Innocent.PlayerId))
-                        {
-                            isInnocentWinConverted = true;
-                            break;
-                        }
-                    }
-                    if (!isInnocentWinConverted)
-                    {
-                        if (DecidedWinner)
-                        {
-                            CustomWinnerHolder.ShiftWinnerAndSetWinner(CustomWinner.Innocent);
-                        }
-                        else
-                        {
-                            CustomWinnerHolder.ResetAndSetWinner(CustomWinner.Innocent);
-                        }
-
-                        pcArray.Do(x => CustomWinnerHolder.WinnerIds.Add(x.PlayerId));
-                    }
-                    DecidedWinner = true;
-                }
-            }
-            //Jester win
-            if (Options.MeetingsNeededForJesterWin.GetInt() <= Main.MeetingsPassed)
-            {           
-                if (role.Is(CustomRoles.Jester) && AmongUsClient.Instance.AmHost)
-                {
-                    if (!CustomWinnerHolder.CheckForConvertedWinner(exiled.PlayerId))
-                    {
-                        CustomWinnerHolder.ResetAndSetWinner(CustomWinner.Jester);
-                        CustomWinnerHolder.WinnerIds.Add(exiled.PlayerId);
-                    }
-
-                    foreach (var executioner in Executioner.playerIdList)
-                    {
-                        //var GetValue = Executioner.Target.TryGetValue(executioner, out var targetId);
-                        if (Executioner.Target.TryGetValue(executioner, out var targetId) && exiled.PlayerId == targetId)
-                        {
-                            CustomWinnerHolder.AdditionalWinnerTeams.Add(AdditionalWinners.Executioner);
-                            CustomWinnerHolder.WinnerIds.Add(executioner);
-                        }
-                    }
-                    DecidedWinner = true;
-                }
-            }
-
-            // Mini win
-            if (role.Is(CustomRoles.NiceMini) && Mini.Age < 18)
-            {
-                if (!CustomWinnerHolder.CheckForConvertedWinner(exiled.PlayerId))
-                {
-                    CustomWinnerHolder.ResetAndSetWinner(CustomWinner.NiceMini);
-                    CustomWinnerHolder.WinnerIds.Add(exiled.PlayerId);
-                }
-            }
-
-            //Executioner check win
-            if (Executioner.CheckExileTarget(exiled, DecidedWinner))
-            {
-                DecidedWinner = true;
-            }
-
-            //Terrorist check win
-            if (role.Is(CustomRoles.Terrorist))
-            {
-                Utils.CheckTerroristWin(exiled);
-            }
-
-            //Devourer check win
-            if (role.Is(CustomRoles.Devourer))
-            {
-                Devourer.OnDevourerDied(exiled.PlayerId);
-            }
-
-            //Lawyer check win
-            if (Lawyer.CheckExileTarget(exiled, DecidedWinner))
-            {
-                DecidedWinner = false;
-            }
-
-            if (role.Is(CustomRoles.Devourer))
-            {
-                Devourer.OnDevourerDied(exiled.PlayerId);
-            }
-
-            if (Lawyer.CheckExileTarget(exiled, DecidedWinner))
-            {
-                DecidedWinner = false;
-            }
-
+            CustomRoleManager.AllEnabledRoles.Do(roleClass => roleClass.CheckExileTarget(exiled, ref DecidedWinner, isMeetingHud: false, name: ref emptyString));
 
             if (CustomWinnerHolder.WinnerTeam != CustomWinner.Terrorist) Main.PlayerStates[exiled.PlayerId].SetDead();
-
-            Instigator.OnPlayerExile(exiled);
         }
+        
         if (AmongUsClient.Instance.AmHost && Main.IsFixedCooldown)
         {
             Main.RefixCooldownDelay = Options.DefaultKillCooldown - 3f;
         }
 
-        if (Witch.IsEnable) 
-            Witch.RemoveSpelledPlayer();
-
-        if (HexMaster.IsEnable)
-            HexMaster.RemoveHexedPlayer();
         
         foreach (var player in Main.AllPlayerControls)
         {
-            //PlayerControl player = allPlayerControls[item];
-            CustomRoles playerRole = player.GetCustomRole(); // Only roles (no add-ons)
-
-            switch (playerRole)
-            {
-                case CustomRoles.Mayor when Options.MayorHasPortableButton.GetBool():
-                    player.RpcResetAbilityCooldown();
-                    break;
-
-                case CustomRoles.Warlock:
-                    Main.CursedPlayers[player.PlayerId] = null;
-                    Main.isCurseAndKill[player.PlayerId] = false;
-                    break;
-
-                case CustomRoles.Bard:
-                    Bard.OnExileWrapUp(player, exiled);
-                    break;
-
-                case CustomRoles.Quizmaster:
-                    Quizmaster.OnVotedOut();
-                    break;
-            }
-
-            if (Infectious.IsEnable)
-            {
-                if (playerRole.Is(CustomRoles.Infectious) && !player.IsAlive())
-                {
-                    Infectious.MurderInfectedPlayers();
-                }
-            }
-
-            if (Shroud.IsEnable)
-            {
-                Shroud.MurderShroudedPlayers(player);
-            }
+            player.GetRoleClass()?.OnPlayerExiled(player, exiled);
 
             // Check Anti BlackOut
             if (player.GetCustomRole().IsImpostor() 
@@ -247,44 +123,31 @@ class ExileControllerWrapUpPatch
         Main.MeetingsPassed++;
 
         FallFromLadder.Reset();
-        Utils.CountAlivePlayers(true);
+        Utils.CountAlivePlayers(sendLog: true, checkGameEnd: Options.CurrentGameMode is CustomGameMode.Standard);
         Utils.AfterMeetingTasks();
         Utils.SyncAllSettings();
-        Utils.NotifyRoles(ForceLoop: true);
+        Utils.NotifyRoles(NoCache: true);
 
-        if (Options.RandomSpawn.GetBool() || Options.CurrentGameMode == CustomGameMode.FFA)
+        if (RandomSpawn.IsRandomSpawn() || Options.CurrentGameMode == CustomGameMode.FFA)
         {
             _ = new LateTask(() =>
             {
-                RandomSpawn.SpawnMap map;
-                switch (Utils.GetActiveMapId())
+                RandomSpawn.SpawnMap map = Utils.GetActiveMapId() switch
                 {
-                    case 0:
-                        map = new RandomSpawn.SkeldSpawnMap();
-                        Main.AllPlayerControls.Do(map.RandomTeleport);
-                        break;
-                    case 1:
-                        map = new RandomSpawn.MiraHQSpawnMap();
-                        Main.AllPlayerControls.Do(map.RandomTeleport);
-                        break;
-                    case 2:
-                        map = new RandomSpawn.PolusSpawnMap();
-                        Main.AllPlayerControls.Do(map.RandomTeleport);
-                        break;
-                    case 3:
-                        map = new RandomSpawn.DleksSpawnMap();
-                        Main.AllPlayerControls.Do(map.RandomTeleport);
-                        break;
-                    case 5:
-                        map = new RandomSpawn.FungleSpawnMap();
-                        Main.AllPlayerControls.Do(map.RandomTeleport);
-                        break;
-                }
+                    0 => new RandomSpawn.SkeldSpawnMap(),
+                    1 => new RandomSpawn.MiraHQSpawnMap(),
+                    2 => new RandomSpawn.PolusSpawnMap(),
+                    3 => new RandomSpawn.DleksSpawnMap(),
+                    5 => new RandomSpawn.FungleSpawnMap(),
+                    _ => null,
+                };
+                if (map != null) Main.AllPlayerControls.Do(map.RandomTeleport);
+
             }, 0.8f, "Random Spawn After Meeting");
         }
     }
 
-    static void WrapUpFinalizer(GameData.PlayerInfo exiled)
+    static void WrapUpFinalizer(NetworkedPlayerInfo exiled)
     {
         // Even if an exception occurs in WrapUpPostfix, this is the only part that will be executed reliably.
         if (AmongUsClient.Instance.AmHost)
@@ -323,7 +186,7 @@ class ExileControllerWrapUpPatch
                         player?.ResetPlayerCam(1f);
                     }
 
-                    Utils.AfterPlayerDeathTasks(player);
+                    MurderPlayerPatch.AfterPlayerDeathTasks(player, player, true);
                 });
                 Main.AfterMeetingDeathPlayers.Clear();
 
@@ -336,6 +199,13 @@ class ExileControllerWrapUpPatch
         GameStates.AlreadyDied |= !Utils.IsAllAlive;
         RemoveDisableDevicesPatch.UpdateDisableDevices();
         SoundManager.Instance.ChangeAmbienceVolume(DataManager.Settings.Audio.AmbienceVolume);
+
+        _ = new LateTask(() =>
+        {
+            if (!AmongUsClient.Instance.IsGameOver)
+                DestroyableSingleton<HudManager>.Instance.SetHudActive(true);
+        }, 0.8f, "Set Hud Active");
+
         Logger.Info("Start of Task Phase", "Phase");
     }
 

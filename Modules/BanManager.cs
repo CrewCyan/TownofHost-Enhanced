@@ -1,9 +1,6 @@
-using HarmonyLib;
 using InnerNet;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -108,9 +105,10 @@ public static class BanManager
         }
     }
     
-    public static void CheckDenyNamePlayer(InnerNet.ClientData player)
+    public static bool CheckDenyNamePlayer(PlayerControl player, string name)
     {
-        if (!AmongUsClient.Instance.AmHost || !Options.ApplyDenyNameList.GetBool()) return;
+        if (!AmongUsClient.Instance.AmHost || !Options.ApplyDenyNameList.GetBool()) return false;
+
         try
         {
             Directory.CreateDirectory("TOHE-DATA");
@@ -122,44 +120,49 @@ public static class BanManager
                 if (line == "") continue;
                 if (line.Contains("Amogus"))
                 {
-                    AmongUsClient.Instance.KickPlayer(player.Id, false);
-                    Logger.SendInGame(string.Format(GetString("Message.KickedByDenyName"), player.PlayerName, line));
-                    Logger.Info($"{player.PlayerName}は名前が「{line}」に一致したためキックされました。", "Kick");
-                    return;
+                    AmongUsClient.Instance.KickPlayer(player.OwnerId, false);
+                    Logger.SendInGame(string.Format(GetString("Message.KickedByDenyName"), name, line));
+                    Logger.Info($"{name}は名前が「{line}」に一致したためキックされました。", "Kick");
+                    return true;
                 }
                 if (line.Contains("Amogus V"))
                 {
-                    AmongUsClient.Instance.KickPlayer(player.Id, false);
-                    Logger.SendInGame(string.Format(GetString("Message.KickedByDenyName"), player.PlayerName, line));
-                    Logger.Info($"{player.PlayerName}は名前が「{line}」に一致したためキックされました。", "Kick");
-                    return;
+                    AmongUsClient.Instance.KickPlayer(player.OwnerId, false);
+                    Logger.SendInGame(string.Format(GetString("Message.KickedByDenyName"), name, line));
+                    Logger.Info($"{name}は名前が「{line}」に一致したためキックされました。", "Kick");
+                    return true;
                 }
 
-                if (Regex.IsMatch(player.PlayerName, line))
+                if (Regex.IsMatch(name, line))
                 {
-                    AmongUsClient.Instance.KickPlayer(player.Id, false);
-                    Logger.SendInGame(string.Format(GetString("Message.KickedByDenyName"), player.PlayerName, line));
-                    Logger.Info($"{player.PlayerName}は名前が「{line}」に一致したためキックされました。", "Kick");
-                    return;
+                    AmongUsClient.Instance.KickPlayer(player.OwnerId, false);
+                    Logger.SendInGame(string.Format(GetString("Message.KickedByDenyName"), name, line));
+                    Logger.Info($"{name}は名前が「{line}」に一致したためキックされました。", "Kick");
+                    return true;
                 }
             }
+            return false;
         }
         catch (Exception ex)
         {
             Logger.Exception(ex, "CheckDenyNamePlayer");
+            return true;
         }
     }
     public static void CheckBanPlayer(InnerNet.ClientData player)
     {
         if (!AmongUsClient.Instance.AmHost || !Options.ApplyBanList.GetBool()) return;
-        if (CheckBanList(player?.FriendCode, player?.GetHashedPuid()))
+
+        string friendcode = player?.FriendCode;
+
+        if (CheckBanList(friendcode, player?.GetHashedPuid()))
         {
             AmongUsClient.Instance.KickPlayer(player.Id, true);
             Logger.SendInGame(string.Format(GetString("Message.BannedByBanList"), player.PlayerName));
             Logger.Info($"{player.PlayerName}は過去にBAN済みのためBANされました。", "BAN");
             return;
         }
-        if (CheckEACList(player?.FriendCode, player?.GetHashedPuid()))
+        if (CheckEACList(friendcode, player?.GetHashedPuid()))
         {
             AmongUsClient.Instance.KickPlayer(player.Id, true);
             Logger.SendInGame(string.Format(GetString("Message.BannedByEACList"), player.PlayerName));
@@ -179,6 +182,14 @@ public static class BanManager
         bool OnlyCheckPuid = false;
         if (code == "" && hashedpuid != "") OnlyCheckPuid = true;
         else if (code == "") return false;
+
+        string noDiscrim = "";
+        if (code.Contains('#'))
+        {
+            int index = code.IndexOf('#');
+            noDiscrim = code[..index];
+        }
+
         try
         {
             Directory.CreateDirectory("TOHE-DATA");
@@ -189,7 +200,10 @@ public static class BanManager
             {
                 if (line == "") continue;
                 if (!OnlyCheckPuid)
+                {
                     if (line.Contains(code)) return true;
+                    if (!string.IsNullOrEmpty(noDiscrim) && !line.Contains('#') && line.Contains(noDiscrim)) return true;
+                }
                 if (line.Contains(hashedpuid)) return true;
             }
         }
@@ -201,14 +215,18 @@ public static class BanManager
     }
     public static bool CheckEACList(string code, string hashedPuid)
     {
-        if (code == "" && hashedPuid == "") return false;
+        var splitCode = code.Split("#")[0].ToLower().Trim();
+        if (string.IsNullOrEmpty(splitCode) && string.IsNullOrEmpty(hashedPuid)) return false;
+
         foreach (var user in EACDict)
         {
-            if ((user["friendcode"].ToString().ToLower().Trim() == code.ToLower().Trim())
+            var splitUser = user["friendcode"].ToString().Split('#')[0].ToLower().Trim();
+
+            if ((!string.IsNullOrEmpty(splitCode) && (splitCode == splitUser))
                 || (user["hashPUID"].ToString().ToLower().Trim() == hashedPuid.ToLower().Trim()))
             {
                 Logger.Warn($"friendcode : {code}, hashedPUID : {hashedPuid} banned by EAC reason : {user["reason"]}", "CheckEACList");
-                return true; 
+                return true;
             }
         }
 

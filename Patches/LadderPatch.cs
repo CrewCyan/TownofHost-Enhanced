@@ -1,5 +1,3 @@
-using HarmonyLib;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace TOHE;
@@ -14,7 +12,7 @@ public class FallFromLadder
     }
     public static void OnClimbLadder(PlayerPhysics player, Ladder source)
     {
-        if (!Options.LadderDeath.GetBool()) return;
+        if (!Options.LadderDeath.GetBool() || player.myPlayer.Is(CustomRoles.Solsticer)) return;
         var sourcePos = source.transform.position;
         var targetPos = source.Destination.transform.position;
         //降りているのかを検知
@@ -35,14 +33,16 @@ public class FallFromLadder
             if (Vector2.Distance(TargetLadderData[player.PlayerId], player.transform.position) < 0.5f)
             {
                 if (player.Data.IsDead) return;
-                //LateTaskを入れるため、先に死亡判定を入れておく
+                // To put in LateTask, put in a death decision first
                 player.Data.IsDead = true;
                 _ = new LateTask(() =>
                 {
                     Vector2 targetPos = (Vector2)TargetLadderData[player.PlayerId] + new Vector2(0.1f, 0f);
                     ushort num = (ushort)(NetHelpers.XRange.ReverseLerp(targetPos.x) * 65535f);
                     ushort num2 = (ushort)(NetHelpers.YRange.ReverseLerp(targetPos.y) * 65535f);
-                    
+
+                    player.SetDeathReason(PlayerState.DeathReason.Fall);
+
                     CustomRpcSender sender = CustomRpcSender.Create("LadderFallRpc", sendOption: Hazel.SendOption.None);
                     sender.AutoStartRpc(player.NetTransform.NetId, (byte)RpcCalls.SnapTo)
                         .Write(num)
@@ -55,8 +55,6 @@ public class FallFromLadder
                     sender.SendMessage();
                     player.NetTransform.SnapTo(targetPos);
                     player.MurderPlayer(player, ExtendedPlayerControl.ResultFlags);
-                    Main.PlayerStates[player.PlayerId].deathReason = PlayerState.DeathReason.Fall;
-                    Main.PlayerStates[player.PlayerId].SetDead();
                 }, 0.05f, "Ladder Fall Task");
             }
         }
@@ -65,7 +63,7 @@ public class FallFromLadder
 [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.ClimbLadder))]
 class LadderPatch
 {
-    public static void Postfix(PlayerPhysics __instance, Ladder source, byte climbLadderSid)
+    public static void Postfix(PlayerPhysics __instance, Ladder source)
     {
         FallFromLadder.OnClimbLadder(__instance, source);
     }

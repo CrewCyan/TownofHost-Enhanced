@@ -1,48 +1,62 @@
 using AmongUs.GameOptions;
-using System.Collections.Generic;
+using TOHE.Roles.Core;
+using UnityEngine;
 using static TOHE.Options;
 
 namespace TOHE.Roles.Neutral;
 
-public static class Maverick
+internal class Maverick : RoleBase
 {
-    private static readonly int Id = 13200;
-    public static List<byte> playerIdList = [];
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 13200;
+    public static bool HasEnabled = CustomRoleManager.HasEnabled(CustomRoles.Maverick);
+
+    public override CustomRoles ThisRoleBase => CustomRoles.Impostor;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.NeutralBenign;
+    //==================================================================\\
 
     private static OptionItem KillCooldown;
-    public static OptionItem CanVent;
+    private static OptionItem CanVent;
     private static OptionItem HasImpostorVision;
+    public static OptionItem MinKillsForWin;
 
-    public static void SetupCustomOption()
+    public int NumKills = new();
+
+    public override void SetupCustomOption()
     {
-        //Maverickは1人固定
         SetupSingleRoleOptions(Id, TabGroup.NeutralRoles, CustomRoles.Maverick, 1, zeroOne: false);
-        KillCooldown = FloatOptionItem.Create(Id + 10, "KillCooldown", new(0f, 180f, 2.5f), 20f, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Maverick])
+        KillCooldown = FloatOptionItem.Create(Id + 10, GeneralOption.KillCooldown, new(0f, 180f, 2.5f), 20f, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Maverick])
             .SetValueFormat(OptionFormat.Seconds);
-        CanVent = BooleanOptionItem.Create(Id + 11, "CanVent", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Maverick]);
-        HasImpostorVision = BooleanOptionItem.Create(Id + 13, "ImpostorVision", true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Maverick]);
+        CanVent = BooleanOptionItem.Create(Id + 11, GeneralOption.CanVent, true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Maverick]);
+        HasImpostorVision = BooleanOptionItem.Create(Id + 13, GeneralOption.ImpostorVision, true, TabGroup.NeutralRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Maverick]);
+        MinKillsForWin = IntegerOptionItem.Create(Id + 14, "Maverick_MinKillsToWin", new(0, 14, 1), 2, TabGroup.NeutralRoles, false)
+            .SetParent(CustomRoleSpawnChances[CustomRoles.Maverick]);
     }
-    public static void Init()
+    public override void Add(byte playerId)
     {
-        playerIdList = [];
-        IsEnable = false;
-    }
-    public static void Add(byte playerId)
-    {
-        playerIdList.Add(playerId);
-        IsEnable = true;
+        NumKills = 0;
 
-        if (!AmongUsClient.Instance.AmHost) return;
         if (!Main.ResetCamPlayerList.Contains(playerId))
             Main.ResetCamPlayerList.Add(playerId);
     }
-    public static void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = KillCooldown.GetFloat();
-    public static void ApplyGameOptions(IGameOptions opt) => opt.SetVision(HasImpostorVision.GetBool());
-    public static void CanUseVent(PlayerControl player)
+    public override bool CanUseKillButton(PlayerControl pc) => true;
+    public override bool CanUseImpostorVentButton(PlayerControl pc) => CanVent.GetBool();
+    public override void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = KillCooldown.GetFloat();
+    public override void ApplyGameOptions(IGameOptions opt, byte id) => opt.SetVision(HasImpostorVision.GetBool());
+    public override string GetProgressText(byte playerId, bool comms)
     {
-        bool Maverick_canUse = CanVent.GetBool();
-        DestroyableSingleton<HudManager>.Instance.ImpostorVentButton.ToggleVisible(Maverick_canUse && !player.Data.IsDead);
-        player.Data.Role.CanVent = Maverick_canUse;
+        int minKills = MinKillsForWin.GetInt();
+        if (minKills == 0) return string.Empty;
+
+        if (Main.PlayerStates[playerId].RoleClass is not Maverick mr) return string.Empty;
+        int numKills = mr.NumKills;
+        Color color = numKills >= minKills ? Color.green : Color.red;
+        return Utils.ColorString(color, $"({numKills}/{minKills})");
+    }
+    public override void OnMurderPlayerAsKiller(PlayerControl killer, PlayerControl target, bool inMeeting, bool isSuicide)
+    {
+        if (isSuicide) return;
+
+        NumKills++;
     }
 }

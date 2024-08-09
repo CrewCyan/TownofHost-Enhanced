@@ -1,30 +1,35 @@
 ﻿using Hazel;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using InnerNet;
 using System.Text.RegularExpressions;
 using TOHE.Modules.ChatManager;
+using TOHE.Roles.Core;
+using TOHE.Roles.Double;
 using UnityEngine;
 using static TOHE.Translator;
+using static TOHE.Utils;
+
 
 namespace TOHE.Roles.Neutral;
-public static class Pirate
+internal class Pirate : RoleBase
 {
-    private static readonly int Id = 15000;
-    private static List<byte> playerIdList = [];
-    public static bool IsEnable = false;
-    public static byte PirateTarget;
-    private static Dictionary<byte, bool> DuelDone = [];
+    //===========================SETUP================================\\
+    private const int Id = 15000;
+    public static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Pirate);
+    public override CustomRoles ThisRoleBase => CustomRoles.Impostor;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.NeutralChaos;
+    //==================================================================\\
+
+    private static OptionItem SuccessfulDuelsToWin;
+    private static OptionItem TryHideMsg;
+    private static OptionItem DuelCooldown;
+
+    private static readonly Dictionary<byte, bool> DuelDone = [];
+
+    private static byte PirateTarget;
     private static int pirateChose, targetChose;
     public static int NumWin = 0;
 
-
-    public static OptionItem SuccessfulDuelsToWin;
-    private static OptionItem TryHideMsg;
-    public static OptionItem DuelCooldown;
-
-
-    public static void SetupCustomOption()
+    public override void SetupCustomOption()
     {
         Options.SetupRoleOptions(Id, TabGroup.NeutralRoles, CustomRoles.Pirate);
         DuelCooldown = FloatOptionItem.Create(Id + 12, "DuelCooldown", new(0f, 180f, 2.5f), 22.5f, TabGroup.NeutralRoles, false).SetParent(Options.CustomRoleSpawnChances[CustomRoles.Pirate])
@@ -35,45 +40,72 @@ public static class Pirate
             .SetValueFormat(OptionFormat.Times);
     }
 
-    public static void Init()
+    public override void Init()
     {
-        playerIdList = [];
         PirateTarget = byte.MaxValue;
-        DuelDone = [];
+        DuelDone.Clear();
         pirateChose = -1;
         targetChose = -1;
         NumWin = 0;
-        IsEnable = false;
     }
-    public static void Add(byte playerId)
+    public override void Add(byte playerId)
     {
-        playerIdList.Add(playerId);
         DuelDone.Add(playerId, false);
-        IsEnable = true;
 
-        if (!AmongUsClient.Instance.AmHost) return;
         if (!Main.ResetCamPlayerList.Contains(playerId))
             Main.ResetCamPlayerList.Add(playerId);
     }
-    public static void OnMeetingStart()
+    public override void MeetingHudClear()
     {
-        if (!IsEnable || PirateTarget == byte.MaxValue) return;
+        if (!HasEnabled || PirateTarget == byte.MaxValue) return;
 
-        var pc = Utils.GetPlayerById(playerIdList[0]);
-        var tpc = Utils.GetPlayerById(PirateTarget);
+        var pc = _Player;
+        var tpc = GetPlayerById(PirateTarget);
         if (!tpc.IsAlive()) return;
         _ = new LateTask(() =>
         {
-            Utils.SendMessage(GetString("PirateMeetingMsg"), pc.PlayerId, Utils.ColorString(Utils.GetRoleColor(CustomRoles.Pirate), GetString("PirateTitle")));
-            Utils.SendMessage(GetString("PirateTargetMeetingMsg"), tpc.PlayerId, Utils.ColorString(Utils.GetRoleColor(CustomRoles.Pirate), GetString("PirateTitle")));
+            SendMessage(GetString("PirateMeetingMsg"), pc.PlayerId, ColorString(GetRoleColor(CustomRoles.Pirate), GetString("PirateTitle")));
+            SendMessage(GetString("PirateTargetMeetingMsg"), tpc.PlayerId, ColorString(GetRoleColor(CustomRoles.Pirate), GetString("PirateTitle")));
         }, 3f, "Pirate Meeting Messages");
-
     }
-    public static void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = DuelCooldown.GetFloat();
-
-
-    public static bool OnCheckMurder(PlayerControl killer, PlayerControl target)
+    public override void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = DuelCooldown.GetFloat();
+    public override bool CanUseKillButton(PlayerControl pc) => true;
+    public override string GetProgressText(byte playerId, bool comms)
+            => ColorString(GetRoleColor(CustomRoles.Pirate).ShadeColor(0.25f), $"({NumWin}/{SuccessfulDuelsToWin.GetInt()})");
+    
+    public void SendRPC(int operate, byte target = byte.MaxValue, int points = -1)
     {
+        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SyncRoleSkill, SendOption.Reliable, -1);
+        writer.WriteNetObject(_Player);
+        writer.Write(operate);
+        writer.Write(target);
+        if (operate == 1)
+        {
+            writer.Write(points);
+        }
+        AmongUsClient.Instance.FinishRpcImmediately(writer);
+    }
+
+    public override void ReceiveRPC(MessageReader reader, PlayerControl NaN)
+    {
+        int operate = reader.ReadInt32();
+        byte target = reader.ReadByte();
+        PirateTarget = target;
+        if (operate == 1)
+        {
+            int points = reader.ReadInt32();
+            NumWin = points;
+        }
+    }
+
+    public override bool OnCheckMurderAsKiller(PlayerControl killer, PlayerControl target)
+    {
+        if (target.Is(CustomRoles.NiceMini) && Mini.Age < 18)
+        {
+            killer.Notify(ColorString(GetRoleColor(CustomRoles.Gangster), GetString("CantDuel")));
+            return true;
+        }
+
         if (target.Is(CustomRoles.Pestilence)) return true;
         if (PirateTarget != byte.MaxValue)
         {
@@ -82,22 +114,29 @@ public static class Pirate
         }
         Logger.Msg($"{killer.GetNameWithRole()} chose a target {target.GetNameWithRole()}", "Pirate");
         PirateTarget = target.PlayerId;
+        SendRPC(operate: 0, target: target.PlayerId, points: -1);
         DuelDone.Add(PirateTarget, false);
         if (!Options.DisableShieldAnimations.GetBool()) killer.RpcGuardAndKill(killer);
         else killer.SetKillCooldown();
         return false;
     }
-    public static string GetPlunderedMark(byte target, bool isMeeting)
+    public override void SetAbilityButtonText(HudManager hud, byte playerId)
     {
-        if (isMeeting && target == PirateTarget)
+        hud.KillButton.OverrideText(GetString("PirateDuelButtonText"));
+    }
+    public override Sprite GetKillButtonSprite(PlayerControl player, bool shapeshifting) => CustomButton.Get("Challenge");
+
+    public override string GetMarkOthers(PlayerControl seer, PlayerControl target, bool isMeeting = false)
+    {
+        if (target != null && isMeeting && target.PlayerId == PirateTarget)
         {
-            return Utils.ColorString(Utils.GetRoleColor(CustomRoles.Pirate), " ⦿");
+            return ColorString(GetRoleColor(CustomRoles.Pirate), " ⦿");
         }
         return "";
     }
-    public static void AfterMeetingTask()
+    public override void AfterMeetingTasks()
     {
-        var pirateId = playerIdList[0];
+        var pirateId = _state.PlayerId;
         if (PirateTarget != byte.MaxValue)
         {
             if (DuelDone[pirateId])
@@ -107,18 +146,18 @@ public static class Pirate
                     if (targetChose == pirateChose)
                     {
                         NumWin++;
-                        if (Utils.GetPlayerById(PirateTarget).IsAlive())
+                        if (GetPlayerById(PirateTarget).IsAlive())
                         {
                             CheckForEndVotingPatch.TryAddAfterMeetingDeathPlayers(PlayerState.DeathReason.Pirate, PirateTarget);
-                            Utils.GetPlayerById(PirateTarget).SetRealKiller(Utils.GetPlayerById(pirateId));
+                            GetPlayerById(PirateTarget).SetRealKiller(GetPlayerById(pirateId));
                         }
                     }
                 }
                 else
-                if (Utils.GetPlayerById(PirateTarget).IsAlive())
+                if (GetPlayerById(PirateTarget).IsAlive())
                 {
                     CheckForEndVotingPatch.TryAddAfterMeetingDeathPlayers(PlayerState.DeathReason.Pirate, PirateTarget);
-                    Utils.GetPlayerById(PirateTarget).SetRealKiller(Utils.GetPlayerById(pirateId));
+                    GetPlayerById(PirateTarget).SetRealKiller(GetPlayerById(pirateId));
                 }
             }
         }
@@ -133,9 +172,14 @@ public static class Pirate
         }
         DuelDone.Clear();
         PirateTarget = byte.MaxValue;
-        foreach (byte playerId in playerIdList) { DuelDone.Add(playerId, false); }
+        SendRPC(operate: 1, target: byte.MaxValue, points: NumWin);
+        foreach (byte playerId in Main.PlayerStates.Values.Where(x => x.MainRole == CustomRoles.Pirate).Select(x => x.PlayerId)) { DuelDone.Add(playerId, false); }
     }
-
+    public override void OnMurderPlayerAsTarget(PlayerControl killer, PlayerControl target, bool inMeeting, bool isSuicide)
+    {
+        PirateTarget = byte.MaxValue;
+        SendRPC(operate: 1, target: byte.MaxValue, points: NumWin);
+    }
     public static bool DuelCheckMsg(PlayerControl pc, string msg, bool isUI = false)
     {
         var originMsg = msg;
@@ -151,7 +195,7 @@ public static class Pirate
 
         if (!pc.IsAlive())
         {
-            Utils.SendMessage(GetString("PirateDead"), pc.PlayerId);
+            pc.ShowInfoMessage(isUI, GetString("PirateDead"));
             return true;
         }
 
@@ -165,11 +209,11 @@ public static class Pirate
                 TryHideMsgForDuel();
                 ChatManager.SendPreviousMessagesToAll();
             }
-            else if (pc.AmOwner) Utils.SendMessage(originMsg, 255, pc.GetRealName());
+            else if (pc.AmOwner) SendMessage(originMsg, 255, pc.GetRealName());
 
             if (!MsgToPlayerAndRole(msg, out int rpsOption, out string error))
             {
-                Utils.SendMessage(error, pc.PlayerId);
+                SendMessage(error, pc.PlayerId);
                 return true;
             }
 
@@ -179,8 +223,7 @@ public static class Pirate
             {
                 _ = new LateTask(() =>
                 {
-                    if (!isUI) Utils.SendMessage(GetString("DuelAlreadyDone"), pc.PlayerId);
-                    else pc.ShowPopUp(GetString("DuelAlreadyDone"));
+                    pc.ShowInfoMessage(isUI, GetString("DuelAlreadyDone"));
                     Logger.Msg("Duel attempted more than once", "Pirate");
                 }, 0.2f, "Pirate Duel Already Done");
                 return true;
@@ -196,20 +239,12 @@ public static class Pirate
                 else
                 {
                     targetChose = rpsOption;
-                    //_ = new LateTask(() =>
-                    //{
-                    //    if (!isUI) Utils.SendMessage(String.Format(GetString("TargetDuelDone"), OptionList[pirateChose]), pc.PlayerId);
-                    //    else pc.ShowPopUp(String.Format(GetString("TargetDuelDone"), OptionList[pirateChose]));
-                    //    Logger.Msg($"Target chose {targetChose}", "Pirate");
-                    //}, 0.2f, "Pirate");
-                    //DuelDone[pc.PlayerId] = true;
-                    //return true;
                 }
                 _ = new LateTask(() =>
                 {
-                    if (!isUI) Utils.SendMessage(String.Format(GetString("DuelDone"), rpsOption), pc.PlayerId);
-                    else pc.ShowPopUp(String.Format(GetString("DuelDone"), rpsOption));
+                    pc.ShowInfoMessage(isUI, string.Format(GetString("DuelDone"), rpsOption));
                 }, 0.2f, "Pirate Duel Done");
+
                 DuelDone[pc.PlayerId] = true;
                 return true;
 
@@ -293,7 +328,7 @@ public static class Pirate
                 msg += " ";
                 msg += rd.Next(0, 3).ToString();
             }
-            var player = Main.AllAlivePlayerControls.ToArray()[rd.Next(0, Main.AllAlivePlayerControls.Length)];
+            var player = Main.AllAlivePlayerControls.RandomElement();
             DestroyableSingleton<HudManager>.Instance.Chat.AddChat(player, msg);
             var writer = CustomRpcSender.Create("MessagesToSend", SendOption.None);
             writer.StartMessage(-1);

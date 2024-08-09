@@ -1,6 +1,5 @@
 using AmongUs.Data;
 using Discord;
-using HarmonyLib;
 using System;
 
 namespace TOHE.Patches
@@ -13,6 +12,8 @@ namespace TOHE.Patches
         private static string region = "";
         public static void Prefix([HarmonyArgument(0)] Activity activity)
         {
+            if (activity == null) return;
+
             var details = $"TOHE v{Main.PluginDisplayVersion}";
             activity.Details = details;
 
@@ -22,17 +23,11 @@ namespace TOHE.Patches
                 {
                     if (!DataManager.Settings.Gameplay.StreamerMode)
                     {
-                        int maxSize = GameOptionsManager.Instance.currentNormalGameOptions.MaxPlayers;
+                        int maxSize = GameOptionsManager.Instance.CurrentGameOptions.MaxPlayers;
                         if (GameStates.IsLobby)
                         {
                             lobbycode = GameStartManager.Instance.GameRoomNameCode.text;
-                            region = ServerManager.Instance.CurrentRegion.Name;
-                            if (region == "North America") region = "NA";
-                            else if (region == "Europe") region = "EU";
-                            else if (region == "Asia") region = "AS";
-                            else if (region.Contains("MNA")) region = "MNA";
-                            else if (region.Contains("MEU")) region = "MEU";
-                            else if (region.Contains("MAS")) region = "MAS";
+                            region = Utils.GetRegionName();
                         }
 
                         if (lobbycode != "" && region != "")

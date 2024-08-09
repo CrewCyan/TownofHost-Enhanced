@@ -1,37 +1,80 @@
-using HarmonyLib;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using static TOHE.Credentials;
 using static TOHE.Translator;
 using Object = UnityEngine.Object;
 
 namespace TOHE;
 
-[HarmonyPatch(typeof(MainMenuManager))]
-public static class MainMenuManagerPatch
+[HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start)), HarmonyPriority(Priority.First)]
+public class MainMenuManagerStartPatch
 {
-    private static PassiveButton template;
-    private static PassiveButton gitHubButton;
-    private static PassiveButton kofiButton;
-    private static PassiveButton discordButton;
-    private static PassiveButton websiteButton;
-    //private static PassiveButton patreonButton;
+    public static GameObject amongUsLogo;
+    public static GameObject Ambience;
+    public static SpriteRenderer ToheLogo { get; private set; }
 
-    public static PassiveButton updateButton;
+    private static void Postfix(MainMenuManager __instance)
+    {
+        amongUsLogo = GameObject.Find("LOGO-AU");
 
-    [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.LateUpdate)), HarmonyPostfix]
-    public static void Postfix(MainMenuManager __instance)
+        var rightpanel = __instance.gameModeButtons.transform.parent;
+        var logoObject = new GameObject("titleLogo_TOHE");
+        var logoTransform = logoObject.transform;
+
+        ToheLogo = logoObject.AddComponent<SpriteRenderer>();
+        logoTransform.parent = rightpanel;
+        logoTransform.localPosition = new(-0.16f, 0f, 1f);
+        logoTransform.localScale *= 1.2f;
+
+        if ((Ambience = GameObject.Find("Ambience")) != null)
+        {
+            // Show play button when mod is fully loaded
+            //if (Options.IsLoaded && !__instance.playButton.enabled)
+            //    __instance.playButton.transform.gameObject.SetActive(true);
+
+            //else if (!Options.IsLoaded)
+            //    __instance.playButton?.transform.gameObject.SetActive(false);
+
+            //Logger.Msg($"Play button showed? : Options is loaded: {Options.IsLoaded} - check play button enabled {__instance.playButton.enabled}", "PlayButton");
+
+            Ambience.SetActive(false);
+        }
+    }
+}
+[HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.LateUpdate))]
+class MainMenuManagerLateUpdatePatch
+{
+    private static int lateUpdate = 590;
+    //private static GameObject LoadingHint;
+
+    private static void Postfix(MainMenuManager __instance)
     {
         if (__instance == null) return;
 
-        __instance.playButton.transform.gameObject.SetActive(Options.IsLoaded);
+        if (lateUpdate <= 600)
+        {
+            lateUpdate++;
+            return;
+        }
+        lateUpdate = 0;
 
-        if (TitleLogoPatch.LoadingHint != null)
-            TitleLogoPatch.LoadingHint.SetActive(!Options.IsLoaded);
+        //LoadingHint = new GameObject("LoadingHint");
+
+        //if (!Options.IsLoaded)
+        //{
+        //    LoadingHint.transform.position = Vector3.down;
+        //    var LoadingHintText = LoadingHint.AddComponent<TextMeshPro>();
+        //    LoadingHintText.text = GetString("SettingsAreLoading");
+        //    LoadingHintText.alignment = TextAlignmentOptions.Center;
+        //    LoadingHintText.fontSize = 3f;
+        //    LoadingHintText.transform.position = GameObject.Find("LOGO-AU").transform.position;
+        //    LoadingHintText.transform.position += new Vector3(-0.2f, -0.9f, 0f);
+        //    LoadingHintText.color = new Color32(0, 255, 8, byte.MaxValue); // new Color32(17, 255, 1, byte.MaxValue);
+        //}
+
+        //LoadingHint?.SetActive(!Options.IsLoaded);
+        //__instance.playButton.transform.gameObject.SetActive(Options.IsLoaded);
 
         var PlayOnlineButton = __instance.PlayOnlineButton;
         if (PlayOnlineButton != null)
@@ -46,9 +89,19 @@ public static class MainMenuManagerPatch
             }
         }
     }
+}
+[HarmonyPatch(typeof(MainMenuManager))]
+public static class MainMenuManagerPatch
+{
+    private static PassiveButton template;
+    private static PassiveButton gitHubButton;
+    private static PassiveButton donationButton;
+    private static PassiveButton discordButton;
+    private static PassiveButton websiteButton;
+    //private static PassiveButton patreonButton;
 
     [HarmonyPatch(nameof(MainMenuManager.Start)), HarmonyPostfix, HarmonyPriority(Priority.Normal)]
-    public static void StartPostfix(MainMenuManager __instance)
+    public static void Start_Postfix(MainMenuManager __instance)
     {
         if (template == null) template = __instance.quitButton;
 
@@ -81,7 +134,15 @@ public static class MainMenuManagerPatch
         GameObject splashArt = new("SplashArt");
         splashArt.transform.position = new Vector3(0, 0f, 600f); //= new Vector3(0, 0.40f, 600f);
         var spriteRenderer = splashArt.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = Utils.LoadSprite("TOHE.Resources.Background.TOHE-Background-1.4.0.png", 150f);
+        string folder = "TOHE.Resources.Background.";
+        IRandom rand = IRandom.Instance;
+        if (rand.Next(0, 100) < 30) folder += "PrevArtWinner";
+        else folder += "CurrentArtWinner";
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        string[] fileNames = assembly.GetManifestResourceNames().Where(resourceName => resourceName.StartsWith(folder) && resourceName.EndsWith(".png")).ToArray();
+        int choice = rand.Next(0, fileNames.Length);
+
+        spriteRenderer.sprite = Utils.LoadSprite(fileNames[choice], 150f);
 
 
         //__instance.playLocalButton.inactiveSprites.GetComponent<SpriteRenderer>().color = new Color(0.1647f, 0f, 0.7765f);
@@ -162,32 +223,18 @@ public static class MainMenuManagerPatch
         if (template == null) return;
 
 
-        // ko-fi Button
-        if (kofiButton == null)
+        // donation Button
+        if (donationButton == null)
         {
-            kofiButton = CreateButton(
-                "kofiButton",
+            donationButton = CreateButton(
+                "donationButton",
                 new(-1.8f, -1.1f, 1f),
                 new(0, 255, 255, byte.MaxValue),
                 new(75, 255, 255, byte.MaxValue),
-                () => Application.OpenURL(Main.kofiInviteUrl),
-                GetString("kofi")); //"Kofi"
+                () => Application.OpenURL(Main.DonationInviteUrl),
+                GetString("SupportUs")); //"Donation"
         }
-        kofiButton.gameObject.SetActive(Main.ShowKofiButton);
-
-        // update Button
-        if (updateButton == null)
-        {
-            updateButton = CreateButton(
-                "updateButton",
-                new(3.68f, -2.68f, 1f),
-                new(255, 165, 0, byte.MaxValue),
-                new(255, 200, 0, byte.MaxValue),
-                () => ModUpdater.StartUpdate(ModUpdater.downloadUrl, true),
-                GetString("update")); //"Update"
-            updateButton.transform.localScale = Vector3.one;
-        }
-        updateButton.gameObject.SetActive(ModUpdater.hasUpdate);
+        donationButton.gameObject.SetActive(Main.ShowDonationButton);
 
         // GitHub Button
         if (gitHubButton == null)
@@ -237,9 +284,9 @@ public static class MainMenuManagerPatch
 
     }
 
-    private static PassiveButton CreateButton(string name, Vector3 localPosition, Color32 normalColor, Color32 hoverColor, Action action, string label, Vector2? scale = null)
+    public static PassiveButton CreateButton(string name, Vector3 localPosition, Color32 normalColor, Color32 hoverColor, Action action, string label, Vector2? scale = null)
     {
-        var button = Object.Instantiate(template, Credentials.ToheLogo.transform);
+        var button = Object.Instantiate(template, MainMenuManagerStartPatch.ToheLogo.transform);
         button.name = name;
         Object.Destroy(button.GetComponent<AspectPosition>());
         button.transform.localPosition = localPosition;
@@ -308,13 +355,13 @@ public static class MainMenuManagerPatch
     [HarmonyPatch(nameof(MainMenuManager.OpenAccountMenu))]
     [HarmonyPatch(nameof(MainMenuManager.OpenCredits))]
     [HarmonyPostfix]
-    public static void OpenMenuPostfix()
+    public static void OpenMenu_Postfix()
     {
-        if (ToheLogo != null) ToheLogo.gameObject.SetActive(false);
+        if (MainMenuManagerStartPatch.ToheLogo != null) MainMenuManagerStartPatch.ToheLogo.gameObject.SetActive(false);
     }
     [HarmonyPatch(nameof(MainMenuManager.ResetScreen)), HarmonyPostfix]
-    public static void ResetScreenPostfix()
+    public static void ResetScreen_Postfix()
     {
-        if (ToheLogo != null) ToheLogo.gameObject.SetActive(true);
+        if (MainMenuManagerStartPatch.ToheLogo != null) MainMenuManagerStartPatch.ToheLogo.gameObject.SetActive(true);
     }
 }

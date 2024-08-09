@@ -1,98 +1,119 @@
-using System.Collections.Generic;
-using System.Linq;
-using TOHE.Roles.Neutral;
+using AmongUs.GameOptions;
 using static TOHE.Options;
 using static TOHE.Translator;
 
 namespace TOHE.Roles.Impostor;
 
-public static class Devourer
+internal class Devourer : RoleBase
 {
-    static GameData.PlayerOutfit ConsumedOutfit = new GameData.PlayerOutfit().Set("", 15, "", "", "visor_Crack", "", "");
-    private static Dictionary<byte, GameData.PlayerOutfit> OriginalPlayerSkins = [];
+    private readonly static NetworkedPlayerInfo.PlayerOutfit ConsumedOutfit = new NetworkedPlayerInfo.PlayerOutfit().Set("", 15, "", "", "visor_Crack", "", "");
+    private static readonly Dictionary<byte, NetworkedPlayerInfo.PlayerOutfit> OriginalPlayerSkins = [];
 
-    private static readonly int Id = 5500;
-    public static List<byte> playerIdList = [];
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 5500;
+    private static readonly HashSet<byte> PlayerIds = [];
+    public static bool HasEnabled => PlayerIds.Any();
+    
+    public override CustomRoles ThisRoleBase => CustomRoles.Shapeshifter;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.ImpostorHindering;
+    //==================================================================\\
 
     private static OptionItem DefaultKillCooldown;
     private static OptionItem ReduceKillCooldown;
     private static OptionItem MinKillCooldown;
     private static OptionItem ShapeshiftCooldown;
- //   private static OptionItem ShapeshiftDuration;
-    public static OptionItem HideNameOfConsumedPlayer;
+    private static OptionItem HideNameOfConsumedPlayer;
+    private static OptionItem ShowShapeshiftAnimationsOpt;
 
-    public static Dictionary<byte, List<byte>> PlayerSkinsCosumed = [];
+    private static readonly Dictionary<byte, float> NowCooldown = [];
+    private static readonly Dictionary<byte, List<byte>> PlayerSkinsCosumed = [];
 
-    private static Dictionary<byte, float> NowCooldown = [];
-
-    public static void SetupCustomOption()
+    public override void SetupCustomOption()
     {
         SetupRoleOptions(Id, TabGroup.ImpostorRoles, CustomRoles.Devourer);
-        DefaultKillCooldown = FloatOptionItem.Create(Id + 10, "ArroganceDefaultKillCooldown", new(0f, 180f, 2.5f), 30f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
+        DefaultKillCooldown = FloatOptionItem.Create(Id + 10, GeneralOption.DefaultKillCooldown, new(0f, 180f, 2.5f), 30f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
             .SetValueFormat(OptionFormat.Seconds);
-        ReduceKillCooldown = FloatOptionItem.Create(Id + 11, "ArroganceReduceKillCooldown", new(0f, 180f, 2.5f), 5f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
+        ReduceKillCooldown = FloatOptionItem.Create(Id + 11, GeneralOption.ReduceKillCooldown, new(0f, 180f, 2.5f), 5f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
             .SetValueFormat(OptionFormat.Seconds);
-        MinKillCooldown = FloatOptionItem.Create(Id + 12, "ArroganceMinKillCooldown", new(0f, 180f, 2.5f), 10f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
+        MinKillCooldown = FloatOptionItem.Create(Id + 12, GeneralOption.MinKillCooldown, new(0f, 180f, 2.5f), 10f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
             .SetValueFormat(OptionFormat.Seconds);
         ShapeshiftCooldown = FloatOptionItem.Create(Id + 14, "DevourCooldown", new(0f, 180f, 2.5f), 30f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
             .SetValueFormat(OptionFormat.Seconds);
-   //     ShapeshiftDuration = FloatOptionItem.Create(Id + 15, "ShapeshiftDuration", new(0f, 180f, 2.5f), 20f, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer])
-     //       .SetValueFormat(OptionFormat.Seconds);
         HideNameOfConsumedPlayer = BooleanOptionItem.Create(Id + 16, "DevourerHideNameConsumed", true, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer]);
+        ShowShapeshiftAnimationsOpt = BooleanOptionItem.Create(Id + 17, GeneralOption.ShowShapeshiftAnimations, true, TabGroup.ImpostorRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Devourer]);
     }
-    public static void Init()
+    public override void Init()
     {
-        playerIdList = [];
-        PlayerSkinsCosumed = [];
-        OriginalPlayerSkins = [];
-        NowCooldown = [];
-        IsEnable = false;
+        PlayerSkinsCosumed.Clear();
+        OriginalPlayerSkins.Clear();
+        NowCooldown.Clear();
+        PlayerIds.Clear();
     }
-    public static void Add(byte playerId)
+    public override void Add(byte playerId)
     {
-        playerIdList.Add(playerId);
         PlayerSkinsCosumed.TryAdd(playerId, []);
         NowCooldown.TryAdd(playerId, DefaultKillCooldown.GetFloat());
-        IsEnable = true;
+        PlayerIds.Add(playerId);
+    }
+    public override void Remove(byte playerId)
+    {
+        OnDevourerDied(Utils.GetPlayerById(playerId));
+        PlayerSkinsCosumed.Remove(playerId);
+        NowCooldown.Remove(playerId);
+        PlayerIds.Remove(playerId);
     }
 
-    public static void ApplyGameOptions()
+    public override void ApplyGameOptions(IGameOptions opt, byte playerId)
     {
         AURoleOptions.ShapeshifterCooldown = ShapeshiftCooldown.GetFloat();
         AURoleOptions.ShapeshifterDuration = 1f;
     }
 
-    public static void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = NowCooldown[id];
+    public override void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = NowCooldown[id];
 
-    public static void OnShapeshift(PlayerControl pc, PlayerControl target)
+    public override bool OnCheckShapeshift(PlayerControl shapeshifter, PlayerControl target, ref bool resetCooldown, ref bool shouldAnimate)
     {
-        if (!pc.IsAlive() || Pelican.IsEaten(pc.PlayerId)) return;
+        if (ShowShapeshiftAnimationsOpt.GetBool() || shapeshifter.PlayerId == target.PlayerId) return true;
 
-        if (!PlayerSkinsCosumed[pc.PlayerId].Contains(target.PlayerId))
+        DoEatSkin(shapeshifter, target);
+        return false;
+    }
+    public override void OnShapeshift(PlayerControl shapeshifter, PlayerControl target, bool IsAnimate, bool shapeshifting)
+    {
+        if (!shapeshifting) return;
+
+        DoEatSkin(shapeshifter, target);
+    }
+    private static void DoEatSkin(PlayerControl shapeshifter, PlayerControl target)
+    {
+        if (!PlayerSkinsCosumed[shapeshifter.PlayerId].Contains(target.PlayerId))
         {
             if (!Camouflage.IsCamouflage)
             {
                 SetSkin(target, ConsumedOutfit);
             }
 
-            PlayerSkinsCosumed[pc.PlayerId].Add(target.PlayerId);
-            pc.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Devourer), GetString("DevourerEatenSkin")));
+            PlayerSkinsCosumed[shapeshifter.PlayerId].Add(target.PlayerId);
+            shapeshifter.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Devourer), GetString("DevourerEatenSkin")));
             target.Notify(Utils.ColorString(Utils.GetRoleColor(CustomRoles.Devourer), GetString("EatenByDevourer")));
 
             OriginalPlayerSkins.Add(target.PlayerId, Camouflage.PlayerSkins[target.PlayerId]);
             Camouflage.PlayerSkins[target.PlayerId] = ConsumedOutfit;
 
-            float cdReduction = ReduceKillCooldown.GetFloat() * PlayerSkinsCosumed[pc.PlayerId].Count;
+            float cdReduction = ReduceKillCooldown.GetFloat() * PlayerSkinsCosumed[shapeshifter.PlayerId].Count;
             float cd = DefaultKillCooldown.GetFloat() - cdReduction;
 
-            NowCooldown[pc.PlayerId] = cd < MinKillCooldown.GetFloat() ? MinKillCooldown.GetFloat() : cd;
+            NowCooldown[shapeshifter.PlayerId] = cd < MinKillCooldown.GetFloat() ? MinKillCooldown.GetFloat() : cd;
         }
     }
 
-    public static void OnDevourerDied(byte Devourer)
+    public static bool HideNameOfTheDevoured(byte targetId) => HideNameOfConsumedPlayer.GetBool() && PlayerSkinsCosumed.Any(a => a.Value.Contains(targetId));
+    private static void OnDevourerDied(PlayerControl devourer)
     {
-        foreach (byte player in PlayerSkinsCosumed[Devourer])
+        if (devourer == null) return;
+        var devourerId = devourer.PlayerId;
+
+        foreach (byte player in PlayerSkinsCosumed[devourerId])
         {
             Camouflage.PlayerSkins[player] = OriginalPlayerSkins[player];
 
@@ -106,38 +127,59 @@ public static class Devourer
             }
         }
 
-        PlayerSkinsCosumed[Devourer].Clear();
+        PlayerSkinsCosumed[devourerId].Clear();
     }
 
-    private static void SetSkin(PlayerControl target, GameData.PlayerOutfit outfit)
+    public override void OnMurderPlayerAsTarget(PlayerControl killer, PlayerControl devourer, bool inMeeting, bool isSuicide)
     {
-        var sender = CustomRpcSender.Create(name: $"Camouflage.RpcSetSkin({target.Data.PlayerName})");
+        OnDevourerDied(devourer);
+    }
+
+    public override void OnPlayerExiled(PlayerControl player, NetworkedPlayerInfo exiled)
+    {
+        if (exiled != null && exiled.Object.Is(CustomRoles.Devourer))
+            OnDevourerDied(exiled.Object);
+    }
+
+    private static void SetSkin(PlayerControl target, NetworkedPlayerInfo.PlayerOutfit outfit)
+    {
+        var sender = CustomRpcSender.Create(name: $"Devourer.RpcSetSkin({target.Data.PlayerName})");
 
         target.SetColor(outfit.ColorId);
         sender.AutoStartRpc(target.NetId, (byte)RpcCalls.SetColor)
-            .Write(outfit.ColorId)
+            .Write(target.Data.NetId)
+            .Write((byte)outfit.ColorId)
             .EndRpc();
 
         target.SetHat(outfit.HatId, outfit.ColorId);
         sender.AutoStartRpc(target.NetId, (byte)RpcCalls.SetHatStr)
             .Write(outfit.HatId)
+            .Write(target.GetNextRpcSequenceId(RpcCalls.SetHatStr))
             .EndRpc();
 
         target.SetSkin(outfit.SkinId, outfit.ColorId);
         sender.AutoStartRpc(target.NetId, (byte)RpcCalls.SetSkinStr)
             .Write(outfit.SkinId)
+            .Write(target.GetNextRpcSequenceId(RpcCalls.SetSkinStr))
             .EndRpc();
 
         target.SetVisor(outfit.VisorId, outfit.ColorId);
         sender.AutoStartRpc(target.NetId, (byte)RpcCalls.SetVisorStr)
             .Write(outfit.VisorId)
+            .Write(target.GetNextRpcSequenceId(RpcCalls.SetVisorStr))
             .EndRpc();
 
         target.SetPet(outfit.PetId);
         sender.AutoStartRpc(target.NetId, (byte)RpcCalls.SetPetStr)
             .Write(outfit.PetId)
+            .Write(target.GetNextRpcSequenceId(RpcCalls.SetPetStr))
             .EndRpc();
 
         sender.SendMessage();
+    }
+
+    public override void SetAbilityButtonText(HudManager hud, byte playerId)
+    {
+        hud.AbilityButton.OverrideText(GetString("DevourerButtonText"));
     }
 }

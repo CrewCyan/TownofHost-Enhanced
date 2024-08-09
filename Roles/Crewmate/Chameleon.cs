@@ -1,30 +1,34 @@
-using HarmonyLib;
+using AmongUs.GameOptions;
 using Hazel;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Text;
+using UnityEngine;
+using TOHE.Roles.Core;
+using static TOHE.Utils;
 using static TOHE.Options;
 using static TOHE.Translator;
 
 namespace TOHE.Roles.Crewmate;
 
-public static class Chameleon
+internal class Chameleon : RoleBase
 {
-    private static readonly int Id = 7600;
-    private static List<byte> playerIdList = [];
-    public static bool IsEnable = false;
+    //===========================SETUP================================\\
+    private const int Id = 7600;
+    public static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Chameleon);
+    public override CustomRoles ThisRoleBase => CustomRoles.Engineer;
+    public override Custom_RoleType ThisRoleType => Custom_RoleType.CrewmateSupport;
+    //==================================================================\\
 
-    public static OptionItem ChameleonCooldown;
+    private static OptionItem ChameleonCooldown;
     private static OptionItem ChameleonDuration;
-    public static OptionItem UseLimitOpt;
-    public static OptionItem ChameleonAbilityUseGainWithEachTaskCompleted;
+    private static OptionItem UseLimitOpt;
+    private static OptionItem ChameleonAbilityUseGainWithEachTaskCompleted;
 
-    private static Dictionary<byte, long> InvisTime = [];
-    private static Dictionary<byte, long> lastTime = [];
-    private static Dictionary<byte, int> ventedId = [];
-    public static Dictionary<byte, float> UseLimit = [];
+    private static readonly Dictionary<byte, int> ventedId = [];
+    private static readonly Dictionary<byte, long> InvisCooldown = [];
+    private static readonly Dictionary<byte, long> InvisDuration = [];
 
-    public static void SetupCustomOption()
+    public override void SetupCustomOption()
     {
         SetupRoleOptions(Id, TabGroup.CrewmateRoles, CustomRoles.Chameleon);
         ChameleonCooldown = FloatOptionItem.Create(Id + 2, "ChameleonCooldown", new(1f, 60f, 1f), 30f, TabGroup.CrewmateRoles, false).SetParent(CustomRoleSpawnChances[CustomRoles.Chameleon])
@@ -37,187 +41,214 @@ public static class Chameleon
         .SetParent(CustomRoleSpawnChances[CustomRoles.Chameleon])
         .SetValueFormat(OptionFormat.Times);
     }
-    public static void Init()
+    public override void Init()
     {
-        playerIdList = [];
-        InvisTime = [];
-        lastTime = [];
-        ventedId = [];
-        UseLimit = [];
-        IsEnable = false;
+        InvisCooldown.Clear();
+        InvisDuration.Clear();
+        ventedId.Clear();
     }
-    public static void Add(byte playerId)
+    public override void Add(byte playerId)
     {
-        playerIdList.Add(playerId);
-        UseLimit.Add(playerId, UseLimitOpt.GetInt());
-        IsEnable = true;
+        AbilityLimit = UseLimitOpt.GetInt();
     }
-    public static void SendRPC(PlayerControl pc, bool isLimit = false)
+    public void SendRPC(PlayerControl pc, bool isLimit = false)
     {
-        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SetChameleonTimer, SendOption.Reliable, pc.GetClientId());
+        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte)CustomRPC.SetChameleonTimer, SendOption.Reliable, isLimit ? -1 : pc.GetClientId());
         writer.Write(pc.PlayerId);
         writer.Write(isLimit);
-        if (isLimit) writer.Write(UseLimit[pc.PlayerId]);
-        else 
-        { 
-            writer.Write((InvisTime.TryGetValue(pc.PlayerId, out var x) ? x : -1).ToString());
-            writer.Write((lastTime.TryGetValue(pc.PlayerId, out var y) ? y : -1).ToString());
-            AmongUsClient.Instance.FinishRpcImmediately(writer);
+        if (isLimit)
+        {
+            writer.Write(AbilityLimit);
         }
+        else
+        {
+            writer.Write((InvisCooldown.TryGetValue(pc.PlayerId, out var y) ? y : -1).ToString());
+            writer.Write((InvisDuration.TryGetValue(pc.PlayerId, out var x) ? x : -1).ToString());
+        }
+        AmongUsClient.Instance.FinishRpcImmediately(writer);
     }
-    public static void ReceiveRPC(MessageReader reader)
+    public static void ReceiveRPC_Custom(MessageReader reader)
     {
         byte pid = reader.ReadByte();
         bool isLimit = reader.ReadBoolean();
         if (isLimit)
         {
             float limit = reader.ReadSingle();
-            UseLimit[pid] = limit;
+            Main.PlayerStates[pid].RoleClass.AbilityLimit = limit;
         }
         else 
-        { 
-            InvisTime = [];
-            lastTime = [];
+        {
+            InvisCooldown.Clear();
+            InvisDuration.Clear();
+            long cooldown = long.Parse(reader.ReadString());
             long invis = long.Parse(reader.ReadString());
-            long last = long.Parse(reader.ReadString());
-            if (invis > 0) InvisTime.Add(pid, invis);
-            if (last > 0) lastTime.Add(pid, last);
+            if (cooldown > 0) InvisCooldown.Add(pid, cooldown);
+            if (invis > 0) InvisDuration.Add(pid, invis);
         }
     }
-    public static bool CanGoInvis(byte id)
-        => GameStates.IsInTask && !InvisTime.ContainsKey(id) && !lastTime.ContainsKey(id);
-    public static bool IsInvis(byte id) => InvisTime.ContainsKey(id);
-
-    private static long lastFixedTime = 0;
-    public static void OnReportDeadBody()
+    public override void ApplyGameOptions(IGameOptions opt, byte playerId)
     {
-        lastTime = [];
-        InvisTime = [];
-
-        foreach (var chameleonId in playerIdList.ToArray())
+        AURoleOptions.EngineerCooldown = ChameleonCooldown.GetFloat() + 1f;
+        AURoleOptions.EngineerInVentMaxTime = 1f;
+    }
+    
+    private static bool CanGoInvis(byte id)
+        => GameStates.IsInTask && !InvisDuration.ContainsKey(id) && !InvisCooldown.ContainsKey(id);
+    
+    private static bool IsInvis(byte id) => InvisDuration.ContainsKey(id);
+   
+    public override void OnReportDeadBody(PlayerControl y, NetworkedPlayerInfo x)
+    {
+        foreach (var chameleonId in _playerIdList.ToArray())
         {
-            if (!ventedId.ContainsKey(chameleonId)) continue;
-            var chameleon = Utils.GetPlayerById(chameleonId);
+            if (!IsInvis(chameleonId)) continue;
+            var chameleon = GetPlayerById(chameleonId);
             if (chameleon == null) return;
 
             chameleon?.MyPhysics?.RpcBootFromVent(ventedId.TryGetValue(chameleonId, out var id) ? id : Main.LastEnteredVent[chameleonId].Id);
+            InvisDuration.Remove(chameleonId);
+            ventedId.Remove(chameleonId);
             SendRPC(chameleon);
         }
 
-        ventedId = [];
+        InvisCooldown.Clear();
+        InvisDuration.Clear();
+        ventedId.Clear();
     }
-    public static void AfterMeetingTasks()
+    public override void AfterMeetingTasks()
     {
-        lastTime = [];
-        InvisTime = [];
-        foreach (var pc in Main.AllAlivePlayerControls.Where(x => playerIdList.Contains(x.PlayerId)).ToArray())
+        InvisCooldown.Clear();
+        InvisDuration.Clear();
+
+        foreach (var chameleonId in _playerIdList)
         {
-            lastTime.Add(pc.PlayerId, Utils.GetTimeStamp());
-            SendRPC(pc);
+            var chameleon = GetPlayerById(chameleonId);
+            if (!chameleon.IsAlive()) continue;
+
+            InvisCooldown.Add(chameleon.PlayerId, GetTimeStamp());
+            SendRPC(chameleon);
         }
     }
-    public static void OnFixedUpdate(PlayerControl player)
+    public override bool OnTaskComplete(PlayerControl player, int completedTaskCount, int totalTaskCount)
     {
-        var now = Utils.GetTimeStamp();
-
-        if (lastTime.TryGetValue(player.PlayerId, out var time) && time + (long)ChameleonCooldown.GetFloat() < now)
+        if (player.IsAlive())
         {
-            lastTime.Remove(player.PlayerId);
+            AbilityLimit += ChameleonAbilityUseGainWithEachTaskCompleted.GetFloat();
+            SendRPC(player, isLimit: true);
+        }
+        return true;
+    }
+    public override void OnFixedUpdateLowLoad(PlayerControl player)
+    {
+        var nowTime = GetTimeStamp();
+        var playerId = player.PlayerId;
+        var needSync = false;
+
+        if (InvisCooldown.TryGetValue(playerId, out var oldTime) && (oldTime + (long)ChameleonCooldown.GetFloat() - nowTime) < 0)
+        {
+            InvisCooldown.Remove(playerId);
             if (!player.IsModClient()) player.Notify(GetString("ChameleonCanVent"));
+            needSync = true;
+        }
+
+        foreach (var chameleonInfo in InvisDuration)
+        {
+            var chameleonId = chameleonInfo.Key;
+            var chameleon = GetPlayerById(chameleonId);
+            if (chameleon == null) continue;
+
+            var remainTime = chameleonInfo.Value + (long)ChameleonDuration.GetFloat() - nowTime;
+
+            if (remainTime < 0 || !chameleon.IsAlive())
+            {
+                chameleon?.MyPhysics?.RpcBootFromVent(ventedId.TryGetValue(chameleonId, out var id) ? id : Main.LastEnteredVent[chameleonId].Id);
+
+                ventedId.Remove(chameleonId);
+
+                InvisCooldown.Remove(chameleonId);
+                InvisCooldown.Add(chameleonId, nowTime);
+
+                chameleon.Notify(GetString("ChameleonInvisStateOut"));
+                
+                needSync = true;
+                InvisDuration.Remove(chameleonId);
+            }
+            else if (remainTime <= 10)
+            {
+                if (!chameleon.IsModClient())
+                    chameleon.Notify(string.Format(GetString("ChameleonInvisStateCountdown"), remainTime), sendInLog: false);
+            }
+        }
+
+        if (needSync)
+        {
             SendRPC(player);
         }
-
-        if (lastFixedTime != now)
-        {
-            lastFixedTime = now;
-            Dictionary<byte, long> newList = [];
-            List<byte> refreshList = [];
-            foreach (var it in InvisTime)
-            {
-                var pc = Utils.GetPlayerById(it.Key);
-                if (pc == null) continue;
-                var remainTime = it.Value + (long)ChameleonDuration.GetFloat() - now;
-                if (remainTime < 0)
-                {
-                    lastTime.Add(pc.PlayerId, now);
-                    pc?.MyPhysics?.RpcBootFromVent(ventedId.TryGetValue(pc.PlayerId, out var id) ? id : Main.LastEnteredVent[pc.PlayerId].Id);
-                    ventedId.Remove(pc.PlayerId);
-                    NameNotifyManager.Notify(pc, GetString("ChameleonInvisStateOut"));
-                    pc.RpcResetAbilityCooldown();
-                    SendRPC(pc);
-                    continue;
-                }
-                else if (remainTime <= 10)
-                {
-                    if (!pc.IsModClient()) pc.Notify(string.Format(GetString("ChameleonInvisStateCountdown"), remainTime + 1));
-                }
-                newList.Add(it.Key, it.Value);
-            }
-            InvisTime.Where(x => !newList.ContainsKey(x.Key)).Do(x => refreshList.Add(x.Key));
-            InvisTime = newList;
-            refreshList.Do(x => SendRPC(Utils.GetPlayerById(x)));
-        }
     }
-    public static void OnCoEnterVent(PlayerPhysics __instance, int ventId)
+    public override void OnCoEnterVent(PlayerPhysics physics, int ventId)
     {
-        var pc = __instance.myPlayer;
-        if (!AmongUsClient.Instance.AmHost || IsInvis(pc.PlayerId)) return;
+        var chameleon = physics.myPlayer;
+        var chameleonId = chameleon.Data.PlayerId;
+
+        if (!AmongUsClient.Instance.AmHost || IsInvis(chameleonId)) return;
+
         _ = new LateTask(() =>
         {
-            if (CanGoInvis(pc.PlayerId))
+            if (CanGoInvis(chameleonId))
             {
-                if (UseLimit[pc.PlayerId] >= 1)
+                if (AbilityLimit >= 1)
                 {
-                    ventedId.Remove(pc.PlayerId);
-                    ventedId.Add(pc.PlayerId, ventId);
+                    ventedId.Remove(chameleonId);
+                    ventedId.Add(chameleonId, ventId);
 
-                    MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(__instance.NetId, (byte)RpcCalls.BootFromVent, SendOption.Reliable, pc.GetClientId());
-                    writer.WritePacked(ventId);
-                    AmongUsClient.Instance.FinishRpcImmediately(writer);
+                    physics.RpcBootFromVentDesync(ventId, chameleon);
 
-                    InvisTime.Add(pc.PlayerId, Utils.GetTimeStamp());
-                    SendRPC(pc);
-                    NameNotifyManager.Notify(pc, GetString("ChameleonInvisState"), ChameleonDuration.GetFloat());
+                    InvisDuration.Remove(chameleonId);
+                    InvisDuration.Add(chameleonId, GetTimeStamp());
+                    SendRPC(chameleon);
 
-                    UseLimit[pc.PlayerId] -= 1;
-                    SendRPC(pc, isLimit: true);
+                    AbilityLimit--;
+                    SendRPC(chameleon, isLimit: true);
+
+                    chameleon.Notify(GetString("ChameleonInvisState"), ChameleonDuration.GetFloat());
                 }
                 else
                 {
-                    pc.Notify(GetString("OutOfAbilityUsesDoMoreTasks"));
+                    chameleon.Notify(GetString("OutOfAbilityUsesDoMoreTasks"));
                 }
             }
             else
             {
                 //__instance.myPlayer.MyPhysics.RpcBootFromVent(ventId);
-                NameNotifyManager.Notify(pc, GetString("ChameleonInvisInCooldown"));
+                chameleon.Notify(GetString("ChameleonInvisInCooldown"));
             }
-        }, 0.5f, "Chameleon Vent");
+        }, 0.8f, "Chameleon Vent");
     }
-    public static void OnEnterVent(PlayerControl pc, Vent vent)
+    public override void OnEnterVent(PlayerControl pc, Vent vent)
     {
-        if (!IsEnable) return;
-        if (!pc.Is(CustomRoles.Chameleon) || !IsInvis(pc.PlayerId)) return;
+        if (!IsInvis(pc.PlayerId)) return;
 
-        InvisTime.Remove(pc.PlayerId);
-        lastTime.Add(pc.PlayerId, Utils.GetTimeStamp());
+        InvisDuration.Remove(pc.PlayerId);
+        InvisCooldown.Add(pc.PlayerId, GetTimeStamp());
         SendRPC(pc);
 
         pc?.MyPhysics?.RpcBootFromVent(vent.Id);
-        NameNotifyManager.Notify(pc, GetString("ChameleonInvisStateOut"));
+        pc.Notify(GetString("ChameleonInvisStateOut"));
     }
-    public static string GetHudText(PlayerControl pc)
+    public override string GetLowerText(PlayerControl pc, PlayerControl seen = null, bool isForMeeting = false, bool isForHud = false)
     {
-        if (pc == null || !GameStates.IsInTask || !PlayerControl.LocalPlayer.IsAlive()) return "";
+        // Only for modded
+        if (pc == null || !isForHud || isForMeeting || !pc.IsAlive()) return string.Empty;
+
         var str = new StringBuilder();
         if (IsInvis(pc.PlayerId))
         {
-            var remainTime = InvisTime[pc.PlayerId] + (long)ChameleonDuration.GetFloat() - Utils.GetTimeStamp();
+            var remainTime = InvisDuration[pc.PlayerId] + (long)ChameleonDuration.GetFloat() - GetTimeStamp();
             str.Append(string.Format(GetString("ChameleonInvisStateCountdown"), remainTime + 1));
         }
-        else if (lastTime.TryGetValue(pc.PlayerId, out var time))
+        else if (InvisCooldown.TryGetValue(pc.PlayerId, out var time))
         {
-            var cooldown = time + (long)ChameleonCooldown.GetFloat() - Utils.GetTimeStamp();
+            var cooldown = time + (long)ChameleonCooldown.GetFloat() - GetTimeStamp();
             str.Append(string.Format(GetString("ChameleonInvisCooldownRemain"), cooldown + 1));
         }
         else
@@ -227,12 +258,34 @@ public static class Chameleon
         return str.ToString();
     }
 
-    public static bool OnCheckMurder(PlayerControl killer, PlayerControl target)
+    public override bool OnCheckMurderAsTarget(PlayerControl killer, PlayerControl target)
     {
         if (!IsInvis(killer.PlayerId)) return true;
-        killer.SetKillCooldown();
-        target.RpcCheckAndMurder(target);
-        target.SetRealKiller(killer);
-        return false;
+        target?.MyPhysics?.RpcBootFromVent(ventedId.TryGetValue(target.PlayerId, out var id) ? id : Main.LastEnteredVent[target.PlayerId].Id);
+        return true;
+    }
+    public override void SetAbilityButtonText(HudManager hud, byte id)
+    {
+        hud.AbilityButton.OverrideText(GetString(IsInvis(PlayerControl.LocalPlayer.PlayerId) ? "ChameleonRevertDisguise" : "ChameleonDisguise"));
+        hud.ReportButton.OverrideText(GetString("ReportButtonText"));
+    }
+    public override Sprite GetAbilityButtonSprite(PlayerControl player, bool shapeshifting) => CustomButton.Get("invisible");
+
+    public override string GetProgressText(byte playerId, bool comms)
+    {
+        var ProgressText = new StringBuilder();
+        var taskState13 = Main.PlayerStates?[playerId].TaskState;
+        Color TextColor13;
+        var TaskCompleteColor13 = Color.green;
+        var NonCompleteColor13 = Color.yellow;
+        var NormalColor13 = taskState13.IsTaskFinished ? TaskCompleteColor13 : NonCompleteColor13;
+        TextColor13 = comms ? Color.gray : NormalColor13;
+        string Completed13 = comms ? "?" : $"{taskState13.CompletedTasksCount}";
+        Color TextColor131;
+        if (AbilityLimit < 1) TextColor131 = Color.red;
+        else TextColor131 = Color.white;
+        ProgressText.Append(ColorString(TextColor13, $"({Completed13}/{taskState13.AllTasksCount})"));
+        ProgressText.Append(ColorString(TextColor131, $" <color=#ffffff>-</color> {Math.Round(AbilityLimit, 1)}"));
+        return ProgressText.ToString();
     }
 }

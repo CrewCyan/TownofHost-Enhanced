@@ -16,7 +16,7 @@
 <p align="center">
 
 <center>
-<a href="https://tohre.dev/" target="_blank"><img src="https://img.shields.io/badge/Website%20-%231DA1F2.svg?&style=for-the-badge&logo=vuedotjs&logoColor=white&color=3aa675"/></a>
+<a href="https://weareten.ca/" target="_blank"><img src="https://img.shields.io/badge/Website%20-%231DA1F2.svg?&style=for-the-badge&logo=vuedotjs&logoColor=white&color=3aa675"/></a>
 <a href="https://discord.gg/tohe" target="_blank"><img src="https://img.shields.io/badge/Discord%20-%231DA1F2.svg?&style=for-the-badge&logo=discord&logoColor=white&color=5662f6"/></a>
 <a href="https://github.com/0xDrMoe/TownofHost-Enhanced/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Latest Version%20-%231DA1F2.svg?&style=for-the-badge&logo=github&logoColor=white&color=181717"/></a>
 </center>
@@ -32,23 +32,24 @@
 **Credit to these mods and their developers for the code and help:**
 ### :star: [TOHRE](https://github.com/Loonie-Toons/) 
 > 
-> - TOH: Enhanced was forked from TOH-RE
+> - Town of Host: Enhanced was forked from Town of Host: Re-Edited.
 >
 ### :star: [TOHE](https://github.com/KARPED1EM/TownOfHostEdited) :
 > 
-> - TOHRE was forked from TOHE
+> - Town of Host: Re-Edited was forked from Town of Host: Edited. (TONX)
 > 
 ### :star: [TOH](https://github.com/tukasa0001/TownOfHost) :
 > 
-> - Our repo is based initially on TOH
+> - Our repo is based initially on Town of Host.
 > 
 ### :star: [TOHY](https://github.com/Yumenopai/TownOfHost_Y) :
 > 
 > - Many role ideas
 > - Provided roles: AntiAdminer, CursedWolf, Workaholic, Greedier (Greedy), DarkHide (Stalker)
 > - Reference: Modify game announcement
+> - Ported new UI for settings (for version AU v2024.6.18)
 > 
-### :star: [TOH:TOR](https://github.com/music-discussion/TownOfHost-TheOtherRoles) :
+### :star: [TOH:TOR](https://github.com/discus-sions/TownOfHost-TheOtherRoles) :
 > 
 > - Many role ideas
 > - Reference: Exile Confirm
@@ -67,28 +68,44 @@
 > 
 ### :star: [RHR](https://github.com/sansaaaaai/Revolutionary-host-roles) :
 > 
-> - Reference: Modify settings menu
+> - Reference: Modify settings menu (Last used [1.6.0](https://github.com/0xDrMoe/TownofHost-Enhanced/releases/tag/v1.6.0))
 > 
-### :star: [TOH+](https://github.com/SkullCreeper/TownOfHostPlus)
+### :star: [TOH+](https://github.com/ItzLoonie/TownOfHostPlus)
 >
 > - Provided roles: Shapeshifter, Engineer, Scientist, Marshall, Poisoner, Necroview, Sidekick
 > - Bait and Beartrap as add-ons
 >
-### :star: [Project Lotus](https://github.com/ImaMapleTree/Lotus)
+### :star: [Project: Lotus](https://github.com/Lotus-AU/LotusContinued)
 >
-> - Ideas for some roles (such as Crusader)
+> - Ideas for some roles (Alchemist, Crusader, Chameleon.. more)
 > 
-### :star: [TOHE+](https://github.com/Gurge44/TOHE_PLUS)
+### :star: [EHR (Formerly TOHE+)](https://github.com/Gurge44/EndlessHostRoles)
 >
 > - Provided roles: Pyromaniac, Necromancer, Head Hunter (Huntsman), Alchemist, and others
 > - Game Mode: FFA
-### :star: [TOHEX](https://github.com/TOHEX-Official/TownOfHostEdited-Xi)
+> - Improved Role Summary
+> - Dark Theme
+> - Improved Role Spawns
+> - Some ideas to improve performance
+### :star: [TONEX (Formerly TOHEX)](https://github.com/XtremeWave/TownOfNewEpic_Xtreme)
 >
-> - Provided role: Swapper
+> - Provided roles: Swapper, Berserker, Randomizer and Blackmailer
+> - Improve chat spam system (ChatManager.cs)
 ### :star: [Stellar Roles](https://github.com/Mr-Fluuff/StellarRolesAU)
 >
 > - Provided role: Inspector (Inspector)
-
+### :star: [Mini.RegionInstall](https://github.com/miniduikboot/Mini.RegionInstall)
+>
+> - Using Mini.RegionInstall to add modded server regions
+### :star: [TOU-R](https://github.com/eDonnes124/Town-Of-Us-R)
+>
+> - Host icon during the meeting
+### :star: [MoreGamemodes](https://github.com/Rabek009/MoreGamemodes)
+>
+> - Changer Role Basis (RoleBasisChanger.cs)
+### :star: [Reactor](https://github.com/NuclearPowered/Reactor)
+>
+> - Reference: Disable the 5s timeout on custom servers
 ---
 
 # Legal License Notice

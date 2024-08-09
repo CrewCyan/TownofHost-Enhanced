@@ -1,4 +1,3 @@
-using System.Linq;
 using static TOHE.Options;
 
 namespace TOHE.Roles.AddOns.Common;
@@ -6,12 +5,12 @@ namespace TOHE.Roles.AddOns.Common;
 // https://github.com/Yumenopai/TownOfHost_Y/blob/main/Roles/Crewmate/Y/Rainbow.cs
 public static class Rainbow
 {
-    private static readonly int Id = 27700;
+    private const int Id = 27700;
     public static OptionItem CrewCanBeRainbow;
     public static OptionItem ImpCanBeRainbow;
     public static OptionItem NeutralCanBeRainbow;
-    public static OptionItem RainbowColorChangeCoolDown;
-    public static OptionItem ChangeInCamouflage;
+    private static OptionItem RainbowColorChangeCoolDown;
+    private static OptionItem ChangeInCamouflage;
 
     public static bool isEnabled = false;
     public static long LastColorChange;
@@ -40,11 +39,11 @@ public static class Rainbow
     }
     public static void OnFixedUpdate()
     {
+        if (Camouflage.IsCamouflage && !ChangeInCamouflage.GetBool()) return;
 
         if (LastColorChange + RainbowColorChangeCoolDown.GetInt() <= Utils.GetTimeStamp())
         {
             LastColorChange = Utils.GetTimeStamp();
-            if (Camouflage.IsCamouflage && !ChangeInCamouflage.GetBool()) return;
             ChangeAllColor();
         }
 
@@ -52,12 +51,14 @@ public static class Rainbow
     private static void ChangeAllColor()
     {
         var sender = CustomRpcSender.Create("Rainbow Sender");
-        foreach (var pc in Main.AllAlivePlayerControls.Where(x => x.Is(CustomRoles.Rainbow)))
+        // When the player is in the vent and changes color, he gets stuck
+        foreach (var player in Main.AllPlayerControls.Where(x => x.Is(CustomRoles.Rainbow) && x.IsAlive() && !x.inMovingPlat && !x.inVent && !x.walkingToVent && !x.onLadder))
         {
             int color = PickRandomColor();
-            pc.SetColor(color);
-            sender.AutoStartRpc(pc.NetId, (byte)RpcCalls.SetColor)
-                .Write(color)
+            player.SetColor(color);
+            sender.AutoStartRpc(player.NetId, (byte)RpcCalls.SetColor)
+                .Write(player.Data.NetId)
+                .Write((byte)color)
                 .EndRpc();
         }
         sender.SendMessage();

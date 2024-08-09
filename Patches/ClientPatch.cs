@@ -1,6 +1,4 @@
-using HarmonyLib;
 using InnerNet;
-using System.Collections.Generic;
 using TOHE.Modules;
 using UnityEngine;
 using static TOHE.Translator;
@@ -98,7 +96,7 @@ internal class RunLoginPatch
         if (!EOSManager.Instance.loginFlowFinished) return;
 
         var friendcode = EOSManager.Instance.friendCode;
-        dbConnect.Init();
+        Main.Instance.StartCoroutine(dbConnect.Init());
         if (friendcode == null || friendcode == "")
         {
             EOSManager.Instance.attemptAuthAgain = true;
@@ -175,7 +173,28 @@ internal class InnerNetObjectSerializePatch
 {
     public static void Prefix()
     {
-        if (AmongUsClient.Instance.AmHost)
-            GameOptionsSender.SendAllGameOptions();
+        // This code is sometimes called before the lobby has been created
+        try
+        {
+            if (AmongUsClient.Instance.AmHost)
+                GameOptionsSender.SendAllGameOptions();
+        }
+        catch
+        { }
     }
 }
+
+//[HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.SendClientReady))]
+//internal class SendClientReadyPatch
+//{
+//    public static void Postfix()
+//    {
+//        if (!AmongUsClient.Instance.AmHost)
+//        {
+//            if (PlayerControl.LocalPlayer)
+//            {
+//                RPC.RpcVersionCheck();
+//            }
+//        }
+//    }
+//}

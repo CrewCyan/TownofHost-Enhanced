@@ -1,6 +1,4 @@
-﻿using HarmonyLib;
-
-namespace TOHE;
+﻿namespace TOHE;
 
 // https://github.com/tukasa0001/TownOfHost/pull/1274/commits/164d1463e46f0ec453e136c7a2f28a8039cd7fc4
 
@@ -10,7 +8,7 @@ public static class MovingPlatformBehaviourPatch
     private static bool isDisabled = false;
 
     [HarmonyPatch(nameof(MovingPlatformBehaviour.Start)), HarmonyPrefix]
-    public static void StartPrefix(MovingPlatformBehaviour __instance)
+    public static void Start_Prefix(MovingPlatformBehaviour __instance)
     {
         isDisabled = Options.DisableAirshipMovingPlatform.GetBool();
 
@@ -21,7 +19,7 @@ public static class MovingPlatformBehaviourPatch
         }
     }
     [HarmonyPatch(nameof(MovingPlatformBehaviour.IsDirty), MethodType.Getter), HarmonyPrefix]
-    public static bool GetIsDirtyPrefix(ref bool __result)
+    public static bool GetIsDirty_Prefix(ref bool __result)
     {
         if (isDisabled)
         {
@@ -31,7 +29,7 @@ public static class MovingPlatformBehaviourPatch
         return true;
     }
     [HarmonyPatch(nameof(MovingPlatformBehaviour.Use), typeof(PlayerControl)), HarmonyPrefix]
-    public static bool UsePrefix() => !isDisabled;
+    public static bool Use_Prefix() => !isDisabled;
     [HarmonyPatch(nameof(MovingPlatformBehaviour.SetSide)), HarmonyPrefix]
-    public static bool SetSidePrefix() => !isDisabled;
+    public static bool SetSide_Prefix() => !isDisabled;
 }
